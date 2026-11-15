@@ -8,13 +8,14 @@
   <!-- ?v=N evita o navegador misturar arquivos novos com antigos em cache.
        Aumente N (aqui e nos imports de js/app.js) a cada mudança de JS/CSS,
        até o service worker da Etapa 4 assumir o controle de versões. -->
-  <link rel="stylesheet" href="css/estilo.css?v=3">
-  <script type="module" src="js/app.js?v=3"></script>
+  <link rel="stylesheet" href="css/estilo.css?v=4">
+  <script type="module" src="js/app.js?v=4"></script>
 </head>
 <body>
   <header class="cabecalho">
     <p class="data" id="data-extenso"></p>
     <p class="edicao" id="edicao"></p>
+    <span class="versao" id="versao"></span>
 
     <nav class="ferramentas" aria-label="Ferramentas">
       <button type="button" data-ferramenta="caneta" title="Caneta" aria-label="Caneta">

@@ -61,6 +61,12 @@ body {
   text-overflow: ellipsis;
 }
 
+.versao {
+  font-size: 0.7rem;
+  color: var(--tinta-suave);
+  opacity: 0.6;
+}
+
 /* ---------- Barra de ferramentas ---------- */
 
 .ferramentas {

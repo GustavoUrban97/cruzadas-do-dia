@@ -3,7 +3,7 @@
 
 const MAX_LINHAS = 14;
 
-export function iniciarDiagnostico() {
+export function iniciarDiagnostico(versao) {
   const painel = document.createElement('div');
   painel.className = 'diagnostico';
   const limpar = document.createElement('button');
@@ -27,7 +27,9 @@ export function iniciarDiagnostico() {
   };
 
   const mostrar = () => {
+    const canvas = document.querySelector('canvas.tinta');
     texto.textContent = [
+      `v${versao} · tinta ${canvas ? `${canvas.width}×${canvas.height}` : 'ausente'} · dpr ${devicePixelRatio}`,
       `S Pen: ponta, botão lateral e borracha · palma deve aparecer como "touch"`,
       `movimentos/s ≈ ${taxa}  (pontos coalescidos no último: ${coalescidos})`,
       linhaMovimento,

@@ -57,7 +57,12 @@ export class Tinta {
     papel.addEventListener('pointerup', e => this.aoSoltar(e));
     papel.addEventListener('pointercancel', e => this.aoSoltar(e));
     papel.addEventListener('contextmenu', e => e.preventDefault()); // botão lateral/direito
-    new ResizeObserver(() => this.redimensionar()).observe(papel);
+
+    // Tamanho: já agora, e de novo sempre que a grade mudar (girar a tela etc.).
+    this.redimensionar();
+    this.observador = new ResizeObserver(() => this.redimensionar());
+    this.observador.observe(papel);
+    window.addEventListener('resize', () => this.redimensionar());
   }
 
   // ---------- Tamanho ----------
@@ -66,10 +71,12 @@ export class Tinta {
     const ret = this.papel.getBoundingClientRect();
     if (!ret.width || !ret.height) return;
     const dpr = window.devicePixelRatio || 1;
+    const largura = Math.round(ret.width * dpr), altura = Math.round(ret.height * dpr);
+    if (this.base.canvas.width === largura && this.base.canvas.height === altura) return; // nada mudou
     this.w = ret.width; this.h = ret.height;
     for (const { canvas, ctx } of [this.base, this.traco, this.previsao]) {
-      canvas.width = Math.round(ret.width * dpr);
-      canvas.height = Math.round(ret.height * dpr);
+      canvas.width = largura;
+      canvas.height = altura;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -103,7 +110,8 @@ export class Tinta {
     if (this.gesto) return;                      // já tem um traço em andamento
     if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
     e.preventDefault();
-    this.papel.setPointerCapture(e.pointerId);
+    this.redimensionar();                        // garantia: camada do tamanho da grade
+    try { this.papel.setPointerCapture(e.pointerId); } catch { /* segue sem captura */ }
     this.gesto = { pointerId: e.pointerId, modo: null, pendentes: [], previstos: [] };
     this.iniciarModo(this.ehBorracha(e) ? 'apagar' : 'desenhar');
     this.gesto.pendentes.push(this.pontoDe(e));
