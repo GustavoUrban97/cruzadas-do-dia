@@ -35,33 +35,70 @@ body {
 
 .cabecalho {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.75rem;
-  padding: 0.4rem 0.75rem 0.3rem;
+  padding: 0.2rem 0.5rem 0.2rem 0.75rem;
   border-bottom: 1.5px solid var(--linha);
   white-space: nowrap;
-  overflow: hidden;
-}
-
-.nome {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
 }
 
 .data {
   margin: 0;
-  font-size: 0.9rem;
-  font-style: italic;
-  color: var(--tinta-suave);
+  font-size: 1rem;
+  font-weight: 700;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .edicao {
-  margin: 0 0 0 auto;
+  margin: 0;
   font-size: 0.85rem;
+  font-style: italic;
   color: var(--tinta-suave);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Barra de ferramentas ---------- */
+
+.ferramentas {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.ferramentas button {
+  width: 44px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.ferramentas button svg { width: 24px; height: 24px; }
+
+.ferramentas button.ativa {
+  border-color: var(--linha);
+  background: var(--casa-dica);
+}
+
+.ferramentas button:disabled { opacity: 0.3; cursor: default; }
+
+.ferramentas .separador {
+  width: 1px;
+  height: 24px;
+  margin: 0 4px;
+  background: var(--tinta-suave);
+  opacity: 0.4;
 }
 
 .aviso {
@@ -82,6 +119,47 @@ body {
   align-items: center;
   justify-content: center;
   padding: 0.5rem;
+}
+
+/* ---------- Papel + camada de tinta ---------- */
+
+.papel {
+  position: relative;
+  touch-action: none;       /* sem rolagem/zoom do navegador ao escrever */
+}
+
+.tinta {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;     /* os eventos vão para o .papel */
+}
+
+/* ---------- Diagnóstico (?debug=1) ---------- */
+
+.diagnostico {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  max-height: 40vh;
+  overflow: hidden;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(20, 20, 20, 0.82);
+  color: #e8ffe8;
+  font: 12px/1.35 ui-monospace, "Roboto Mono", Consolas, monospace;
+  white-space: pre;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.diagnostico button {
+  pointer-events: auto;
+  float: right;
+  font: inherit;
+  padding: 2px 8px;
 }
 
 /* ---------- Grade ---------- */

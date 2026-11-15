@@ -8,20 +8,41 @@
   <!-- ?v=N evita o navegador misturar arquivos novos com antigos em cache.
        Aumente N (aqui e nos imports de js/app.js) a cada mudança de JS/CSS,
        até o service worker da Etapa 4 assumir o controle de versões. -->
-  <link rel="stylesheet" href="css/estilo.css?v=2">
-  <script type="module" src="js/app.js?v=2"></script>
+  <link rel="stylesheet" href="css/estilo.css?v=3">
+  <script type="module" src="js/app.js?v=3"></script>
 </head>
 <body>
   <header class="cabecalho">
-    <h1 class="nome">Cruzadas do Dia</h1>
     <p class="data" id="data-extenso"></p>
     <p class="edicao" id="edicao"></p>
+
+    <nav class="ferramentas" aria-label="Ferramentas">
+      <button type="button" data-ferramenta="caneta" title="Caneta" aria-label="Caneta">
+        <svg viewBox="0 0 24 24"><path d="M4 20l1.2-4.6L15.5 5.1a2 2 0 0 1 2.8 0l.6.6a2 2 0 0 1 0 2.8L8.6 18.8z" fill="#1a1a1a"/><path d="M14 6.6l3.4 3.4" stroke="#f6f1e4" stroke-width="1.2"/></svg>
+      </button>
+      <button type="button" data-ferramenta="lapis" title="Lápis" aria-label="Lápis">
+        <svg viewBox="0 0 24 24"><path d="M4 20l1-4L15.5 5.5l3 3L8 19z" fill="none" stroke="#8a867e" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.5 7.5l3 3" stroke="#8a867e" stroke-width="1.8"/></svg>
+      </button>
+      <button type="button" data-ferramenta="borracha" title="Borracha" aria-label="Borracha">
+        <svg viewBox="0 0 24 24"><path d="M9 19l-4-4a1.5 1.5 0 0 1 0-2.1l8-8a1.5 1.5 0 0 1 2.1 0l4 4a1.5 1.5 0 0 1 0 2.1L12 19z M8.5 9.5l6 6 M9 19h11" fill="none" stroke="#1a1a1a" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg>
+      </button>
+      <span class="separador" aria-hidden="true"></span>
+      <button type="button" id="desfazer" title="Desfazer" aria-label="Desfazer" disabled>
+        <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" id="refazer" title="Refazer" aria-label="Refazer" disabled>
+        <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5 M20 9H9.5a5.5 5.5 0 0 0 0 11H13" fill="none" stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </nav>
   </header>
 
   <p class="aviso" id="aviso" hidden></p>
 
   <main class="folha" id="folha">
-    <div class="grade" id="grade" aria-label="Grade"></div>
+    <!-- O "papel" envolve a grade e recebe a camada de tinta (canvas) por cima. -->
+    <div class="papel" id="papel">
+      <div class="grade" id="grade" aria-label="Grade"></div>
+    </div>
   </main>
 </body>
 </html>

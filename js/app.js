@@ -1,10 +1,13 @@
 // Inicialização e escolha do puzzle por data.
 
 // ?v=N: mesmo número usado em index.html (veja o comentário lá).
-import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre } from './datas.js?v=2';
-import { renderizarGrade, ajustarTamanho } from './grade.js?v=2';
+import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre } from './datas.js?v=3';
+import { renderizarGrade, ajustarTamanho } from './grade.js?v=3';
+import { Tinta } from './tinta.js?v=3';
+import { iniciarDiagnostico } from './diagnostico.js?v=3';
 
 const $ = id => document.getElementById(id);
+const parametros = new URLSearchParams(location.search);
 
 async function buscarJSON(caminho) {
   const resposta = await fetch(caminho, { cache: 'no-cache' });
@@ -25,9 +28,47 @@ function escolherPuzzle(data, datasDisponiveis) {
   return { arquivo: datasDisponiveis[indice], substituto: true };
 }
 
+// ---------- Preferências leves (localStorage, sempre com try/catch) ----------
+
+function lerPreferencia(chave, padrao) {
+  try { return localStorage.getItem(chave) ?? padrao; } catch { return padrao; }
+}
+
+function gravarPreferencia(chave, valor) {
+  try { localStorage.setItem(chave, valor); } catch { /* sem armazenamento: tudo bem */ }
+}
+
+// ---------- Barra de ferramentas ----------
+
+function configurarFerramentas(tinta) {
+  const botoes = [...document.querySelectorAll('[data-ferramenta]')];
+  const escolher = nome => {
+    tinta.usar(nome);
+    botoes.forEach(b => b.classList.toggle('ativa', b.dataset.ferramenta === tinta.ferramenta));
+    gravarPreferencia('ferramenta', tinta.ferramenta);
+  };
+  botoes.forEach(b => b.addEventListener('click', () => escolher(b.dataset.ferramenta)));
+  escolher(lerPreferencia('ferramenta', 'caneta'));
+
+  $('desfazer').addEventListener('click', () => tinta.desfazer());
+  $('refazer').addEventListener('click', () => tinta.refazer());
+
+  // Atalhos de teclado (útil no PC): Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z
+  document.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const tecla = e.key.toLowerCase();
+    if (tecla === 'z' && !e.shiftKey) { e.preventDefault(); tinta.desfazer(); }
+    else if (tecla === 'y' || (tecla === 'z' && e.shiftKey)) { e.preventDefault(); tinta.refazer(); }
+  });
+}
+
+// ---------- Início ----------
+
 async function iniciar() {
+  if (parametros.get('debug') === '1') iniciarDiagnostico();
+
   // ?data=AAAA-MM-DD abre um dia específico (útil para testar).
-  const pedida = new URLSearchParams(location.search).get('data');
+  const pedida = parametros.get('data');
   const data = dataValida(pedida) ? pedida : hojeEmBrasilia();
 
   $('data-extenso').textContent = dataPorExtenso(data);
@@ -51,6 +92,15 @@ async function iniciar() {
     ajustar();
     // Girar a tela ou redimensionar a janela: recalcula o tamanho das casas.
     new ResizeObserver(() => requestAnimationFrame(ajustar)).observe($('folha'));
+
+    const tinta = new Tinta($('papel'), {
+      aoMudarHistorico: (podeDesfazer, podeRefazer) => {
+        $('desfazer').disabled = !podeDesfazer;
+        $('refazer').disabled = !podeRefazer;
+      },
+      // aoMudar: salvar no IndexedDB entra na Etapa 3.
+    });
+    configurarFerramentas(tinta);
   } catch (erro) {
     console.error(erro);
     $('folha').innerHTML = '';
