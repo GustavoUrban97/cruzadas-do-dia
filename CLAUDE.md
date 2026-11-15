@@ -77,6 +77,8 @@ Usar **Pointer Events** (`pointerType`):
 - Traços salvos em **coordenadas normalizadas** relativas à grade, para continuarem no lugar ao girar a tela ou redimensionar.
 - Cabeçalho compacto (uma linha): data por extenso ("domingo, 15 de novembro de 2026") e número do puzzle.
 - Sem rolagem acidental nem zoom do navegador ao escrever (`user-scalable=no` no viewport é aceitável aqui).
+- Margem lateral de ~24px em volta da grade: no Tab S9 com navegação por gestos, escrever colado na borda dispara o "voltar" do Android. Além disso, depois de cada traço o app arma uma entrada extra no histórico, para o primeiro gesto de voltar acidental não sair da página (o Chrome só respeita `pushState` feito logo após uma ação do usuário, por isso é rearmado no fim do traço).
+- Sem previsão de pontos (`getPredictedEvents`) por padrão: o "traço futuro" ficou perceptível no Tab S9. `?previsao=1` liga para comparar.
 
 ## Ciclo diário
 

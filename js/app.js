@@ -5,6 +5,7 @@ import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre } from
 import { renderizarGrade, ajustarTamanho } from './grade.js?v=6';
 import { Tinta } from './tinta.js?v=6';
 import { iniciarDiagnostico } from './diagnostico.js?v=6';
+import { carregarTinta, salvarTinta, pedirPersistencia } from './armazenamento.js?v=6';
 
 // Versão do app, mostrada discretamente no cabeçalho (ajuda a saber se o tablet
 // pegou a versão nova ou está abrindo uma antiga do cache).
@@ -66,6 +67,87 @@ function configurarFerramentas(tinta) {
   });
 }
 
+// ---------- Avisos ----------
+
+function mostrarAviso(texto) {
+  const aviso = $('aviso');
+  aviso.textContent = aviso.hidden || !aviso.textContent ? texto : `${aviso.textContent} ${texto}`;
+  aviso.hidden = false;
+}
+
+let temporizadorToast = null;
+function mostrarToast(texto) {
+  const toast = $('toast');
+  toast.textContent = texto;
+  toast.hidden = false;
+  clearTimeout(temporizadorToast);
+  temporizadorToast = setTimeout(() => { toast.hidden = true; }, 3500);
+}
+
+// ---------- Salvar a tinta (IndexedDB) ----------
+
+/** Salva os traços da data; várias mudanças seguidas viram uma gravação só. */
+function criarSalvador(data, tinta) {
+  let fila = Promise.resolve();
+  let agendado = false;
+  let falhou = false;
+  return () => {
+    if (agendado) return fila;
+    agendado = true;
+    fila = fila
+      .then(() => { agendado = false; return salvarTinta(data, tinta.exportar()); })
+      .catch(erro => {
+        agendado = false;
+        console.error(erro);
+        if (!falhou) mostrarAviso('Atenção: não foi possível salvar a tinta neste aparelho.');
+        falhou = true;
+      });
+    return fila;
+  };
+}
+
+// ---------- Gesto de voltar ----------
+
+/**
+ * Coloca uma entrada extra no histórico depois de um traço. Se o gesto de voltar
+ * do Android disparar sem querer, ele consome essa entrada e a página fica onde está.
+ * O Chrome só respeita entradas criadas logo após uma ação do usuário (o traço),
+ * por isso a proteção é rearmada no fim de cada traço, não dentro do popstate.
+ */
+function criarProtecaoVoltar() {
+  const marca = `${Date.now()}-${Math.random()}`; // distingue de entradas de aberturas anteriores
+  let armada = false;
+  window.addEventListener('popstate', () => {
+    if (armada && !(history.state && history.state.guarda === marca)) {
+      armada = false;
+      mostrarToast('Gesto de voltar ignorado. Para sair, faça o gesto de novo.');
+    }
+  });
+  return () => {
+    if (armada) return;
+    try {
+      history.pushState({ guarda: marca }, '');
+      armada = true;
+    } catch { /* sem histórico: tudo bem */ }
+  };
+}
+
+// ---------- Virada da meia-noite ----------
+
+/** Confere a data a cada minuto e ao voltar ao app; avisa, sem trocar à força. */
+function vigiarVirada(dataAberta, aoTrocar) {
+  const conferir = () => {
+    if (hojeEmBrasilia() === dataAberta) return;
+    const faixa = $('novo-puzzle');
+    faixa.hidden = false;
+    faixa.onclick = aoTrocar;
+  };
+  setInterval(conferir, 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') conferir();
+  });
+}
+
 // ---------- Início ----------
 
 async function iniciar() {
@@ -98,14 +180,46 @@ async function iniciar() {
     // Girar a tela ou redimensionar a janela: recalcula o tamanho das casas.
     new ResizeObserver(() => requestAnimationFrame(ajustar)).observe($('folha'));
 
+    // Tinta salva desta data (antes de liberar a caneta, para nada ser sobrescrito).
+    let salvos = [];
+    try {
+      salvos = await carregarTinta(data);
+    } catch (erro) {
+      console.error(erro);
+      mostrarAviso('Atenção: não foi possível ler a tinta salva neste aparelho.');
+    }
+
+    const armarVoltar = criarProtecaoVoltar();
+    let persistenciaPedida = false;
+    let salvar = () => {};
+
     const tinta = new Tinta($('papel'), {
       aoMudarHistorico: (podeDesfazer, podeRefazer) => {
         $('desfazer').disabled = !podeDesfazer;
         $('refazer').disabled = !podeRefazer;
       },
-      // aoMudar: salvar no IndexedDB entra na Etapa 3.
+      aoMudar: () => salvar(),          // ao fim de cada traço, apagada, desfazer, refazer
+      aoTerminarGesto: () => {
+        armarVoltar();
+        if (!persistenciaPedida) { persistenciaPedida = true; pedirPersistencia(); }
+      },
     });
+    tinta.importar(salvos);
+    salvar = criarSalvador(data, tinta);
     configurarFerramentas(tinta);
+
+    // Ao sair do app (trocar de app, apagar a tela), garante a última gravação.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') salvar();
+    });
+
+    // Aberto como "hoje": avisa quando virar o dia em Brasília.
+    if (!dataValida(pedida)) {
+      vigiarVirada(data, async () => {
+        await salvar();
+        location.replace(location.pathname);
+      });
+    }
   } catch (erro) {
     console.error(erro);
     $('folha').innerHTML = '';

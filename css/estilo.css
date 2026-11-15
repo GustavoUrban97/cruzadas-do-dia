@@ -116,6 +116,38 @@ body {
   border-bottom: 1px solid #d8d0bd;
 }
 
+/* Faixa "Novo puzzle disponível" (virada da meia-noite) */
+.faixa {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-bottom: 1.5px solid var(--linha);
+  background: var(--linha);
+  color: var(--papel);
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.faixa[hidden] { display: none; }
+
+/* Mensagem rápida (ex.: gesto de voltar ignorado) */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 48px);
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  background: rgba(26, 26, 26, 0.9);
+  color: var(--papel);
+  font-size: 0.95rem;
+  z-index: 20;
+  pointer-events: none;
+}
+.toast[hidden] { display: none; }
+
 /* ---------- Folha ---------- */
 
 .folha {
