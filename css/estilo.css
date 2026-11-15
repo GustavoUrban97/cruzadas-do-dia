@@ -124,7 +124,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem;
+  /* margem lateral maior: tira a grade da faixa do gesto de voltar do Android */
+  padding: 0.5rem 24px;
 }
 
 /* ---------- Papel + camada de tinta ---------- */

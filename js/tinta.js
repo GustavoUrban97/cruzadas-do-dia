@@ -2,16 +2,17 @@
 // desfazer/refazer. O app não reconhece a escrita; só guarda os traços.
 //
 // Três canvas transparentes empilhados sobre a grade:
-//   base     — traços terminados (redesenhado só quando algo é apagado/desfeito)
-//   traco    — o traço em andamento, desenhado aos pedacinhos (só o segmento novo)
-//   previsao — pontos previstos pelo Chrome e o círculo da borracha; limpo a cada quadro
+//   base   — traços terminados (redesenhado só quando algo é apagado/desfeito)
+//   traco  — o traço em andamento, desenhado aos pedacinhos (só o trecho novo)
+//   extra  — círculo da borracha (e a previsão, se ligada); limpo a cada quadro
 //
 // Os traços são guardados em coordenadas normalizadas (0–1) relativas à grade,
 // para continuarem no mesmo quadrado ao girar a tela.
 
 export const FERRAMENTAS = {
-  caneta: { cor: '#1a1a1a', largura: 0.0032 },  // largura em fração da largura da grade
-  lapis:  { cor: '#8a867e', largura: 0.0021 },
+  // largura em fração da largura da grade
+  caneta: { cor: '#1a1a1a', largura: 0.0034 },
+  lapis:  { cor: '#8a867e', largura: 0.0022 },
 };
 const RAIO_BORRACHA = 0.014; // fração da largura da grade
 
@@ -19,10 +20,122 @@ const RAIO_BORRACHA = 0.014; // fração da largura da grade
 const BOTAO_BORRACHA = 32;  // ponta-borracha (buttons & 32)
 const BOTAO_LATERAL = 2;    // botão lateral da S Pen / botão direito do mouse (buttons & 2)
 
+const parametros = new URLSearchParams(location.search);
+
 // Modo de baixa latência (desynchronized): no Tab S9 ele deixa a parte transparente
-// do canvas PRETA, cobrindo a grade (o canvas vai direto para a tela sem se misturar
-// com o que está embaixo). Por isso fica desligado; dá para testar com ?baixalatencia=1.
-const BAIXA_LATENCIA = new URLSearchParams(location.search).get('baixalatencia') === '1';
+// do canvas PRETA, cobrindo a grade. Fica desligado; dá para testar com ?baixalatencia=1.
+const BAIXA_LATENCIA = parametros.get('baixalatencia') === '1';
+
+// Previsão de pontos do Chrome: desenha uns milissegundos à frente da caneta, mas o
+// "traço futuro" aparece e some de um jeito perceptível. Desligada; ?previsao=1 liga.
+const PREVISAO = parametros.get('previsao') === '1';
+
+// ---------- Pincel: transforma pontos da caneta em tinta ----------
+//
+// O traço é desenhado como forma preenchida: a cada amostra, um círculo do raio
+// daquele ponto e a "ponte" tangente até o círculo anterior. Assim a espessura
+// varia suavemente, sem emendas. A curva passa pelos pontos médios (curva
+// quadrática), a pressão é suavizada e o começo do traço afina levemente.
+// O mesmo pincel desenha ao vivo e redesenha traços salvos, então o resultado
+// é idêntico nos dois casos.
+
+const PASSO = 1.2;            // px entre amostras da curva
+const SUAVIZAR_PRESSAO = 0.3; // 0–1: quanto cada ponto novo puxa a pressão
+const AFINAR_INICIO = 5;      // o começo afina ao longo de N larguras de caneta
+
+class Pincel {
+  constructor(ctx, estilo, larguraGrade) {
+    this.ctx = ctx;
+    this.cor = estilo.cor;
+    this.base = estilo.largura * larguraGrade; // espessura média em px
+    this.pts = [];        // pontos de entrada (px) com pressão suavizada
+    this.ultimo = null;   // última amostra desenhada {x, y, r}
+    this.percorrido = 0;  // comprimento já desenhado (para afinar o início)
+    this.pressao = null;
+  }
+
+  raio(pressao) {
+    const afinar = Math.min(1, this.percorrido / (AFINAR_INICIO * this.base));
+    return this.base * (0.6 + 0.8 * pressao) * (0.55 + 0.45 * afinar) / 2;
+  }
+
+  adicionar({ x, y, p }) {
+    this.pressao = this.pressao === null ? p : this.pressao + SUAVIZAR_PRESSAO * (p - this.pressao);
+    const pt = { x, y, p: this.pressao };
+    this.pts.push(pt);
+    const n = this.pts.length;
+    if (n === 1) {
+      this.ultimo = { x, y, r: this.raio(pt.p) };
+      this.circulo(this.ultimo);
+    } else if (n === 2) {
+      const a = this.pts[0];
+      this.reta(a, meio(a, pt));
+    } else {
+      const z = this.pts[n - 3], a = this.pts[n - 2];
+      this.curva(meio(z, a), a, meio(a, pt));
+    }
+  }
+
+  terminar() {
+    const n = this.pts.length;
+    if (n >= 2) {
+      const a = this.pts[n - 2], b = this.pts[n - 1];
+      this.reta(meio(a, b), b);
+    }
+  }
+
+  reta(a, b) { this.curva(a, meio(a, b), b); }
+
+  /** Amostra a curva quadrática a→c (controle b) e preenche cada pedacinho. */
+  curva(a, b, c) {
+    const comprimento = Math.hypot(b.x - a.x, b.y - a.y) + Math.hypot(c.x - b.x, c.y - b.y);
+    const passos = Math.max(1, Math.ceil(comprimento / PASSO));
+    for (let i = 1; i <= passos; i++) {
+      const t = i / passos, u = 1 - t;
+      const x = u * u * a.x + 2 * u * t * b.x + t * t * c.x;
+      const y = u * u * a.y + 2 * u * t * b.y + t * t * c.y;
+      const p = u * u * a.p + 2 * u * t * b.p + t * t * c.p;
+      this.percorrido += Math.hypot(x - this.ultimo.x, y - this.ultimo.y);
+      const amostra = { x, y, r: this.raio(p) };
+      this.ponte(this.ultimo, amostra);
+      this.circulo(amostra);
+      this.ultimo = amostra;
+    }
+  }
+
+  circulo({ x, y, r }) {
+    const ctx = this.ctx;
+    ctx.fillStyle = this.cor;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /** Quadrilátero tangente aos dois círculos (une as amostras sem emenda). */
+  ponte(a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const d = Math.hypot(dx, dy);
+    if (d <= Math.abs(a.r - b.r) || d < 0.01) return; // um círculo contém o outro
+    const ux = dx / d, uy = dy / d;
+    const s = (a.r - b.r) / d, c = Math.sqrt(1 - s * s);
+    // normais das duas tangentes externas
+    const n1x = ux * s - uy * c, n1y = uy * s + ux * c;
+    const n2x = ux * s + uy * c, n2y = uy * s - ux * c;
+    const ctx = this.ctx;
+    ctx.fillStyle = this.cor;
+    ctx.beginPath();
+    ctx.moveTo(a.x + a.r * n1x, a.y + a.r * n1y);
+    ctx.lineTo(b.x + b.r * n1x, b.y + b.r * n1y);
+    ctx.lineTo(b.x + b.r * n2x, b.y + b.r * n2y);
+    ctx.lineTo(a.x + a.r * n2x, a.y + a.r * n2y);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+const meio = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, p: (a.p + b.p) / 2 });
+
+// ---------- Camadas ----------
 
 function criarCamada(classe, rapida) {
   const canvas = document.createElement('canvas');
@@ -35,18 +148,20 @@ export class Tinta {
   /**
    * @param {HTMLElement} papel  elemento que envolve a grade (recebe os eventos)
    * @param {object} opcoes
-   *   aoMudar()            — chamado ao fim de cada traço/apagada/desfazer (para salvar)
+   *   aoMudar()              — fim de cada traço/apagada/desfazer/refazer (para salvar)
    *   aoMudarHistorico(podeDesfazer, podeRefazer)
+   *   aoTerminarGesto()      — caneta levantada (momento com "ativação do usuário")
    */
-  constructor(papel, { aoMudar = () => {}, aoMudarHistorico = () => {} } = {}) {
+  constructor(papel, { aoMudar = () => {}, aoMudarHistorico = () => {}, aoTerminarGesto = () => {} } = {}) {
     this.papel = papel;
     this.aoMudar = aoMudar;
     this.aoMudarHistorico = aoMudarHistorico;
+    this.aoTerminarGesto = aoTerminarGesto;
 
     this.base = criarCamada('tinta-base', false);
     this.traco = criarCamada('tinta-traco', true);
-    this.previsao = criarCamada('tinta-previsao', true);
-    papel.append(this.base.canvas, this.traco.canvas, this.previsao.canvas);
+    this.extra = criarCamada('tinta-extra', true);
+    papel.append(this.base.canvas, this.traco.canvas, this.extra.canvas);
 
     this.tracos = [];        // { ferramenta, pontos: [[x, y, pressao]], caixa, apagado }
     this.historico = [];     // { tracos: [...], apagar: bool }
@@ -78,12 +193,10 @@ export class Tinta {
     const largura = Math.round(ret.width * dpr), altura = Math.round(ret.height * dpr);
     if (this.base.canvas.width === largura && this.base.canvas.height === altura) return; // nada mudou
     this.w = ret.width; this.h = ret.height;
-    for (const { canvas, ctx } of [this.base, this.traco, this.previsao]) {
+    for (const { canvas, ctx } of [this.base, this.traco, this.extra]) {
       canvas.width = largura;
       canvas.height = altura;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
     }
     this.redesenharBase();
   }
@@ -134,7 +247,7 @@ export class Tinta {
     }
     const eventos = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
     for (const ev of (eventos.length ? eventos : [e])) g.pendentes.push(this.pontoDe(ev));
-    g.previstos = e.getPredictedEvents ? e.getPredictedEvents().map(ev => this.pontoDe(ev)) : [];
+    if (PREVISAO && e.getPredictedEvents) g.previstos = e.getPredictedEvents().map(ev => this.pontoDe(ev));
     this.pedirQuadro();
   }
 
@@ -143,8 +256,9 @@ export class Tinta {
     if (!g || e.pointerId !== g.pointerId) return;
     this.processarPendentes();
     this.encerrarModo();
-    this.previsao.ctx.clearRect(0, 0, this.w, this.h);
+    this.extra.ctx.clearRect(0, 0, this.w, this.h);
     this.gesto = null;
+    this.aoTerminarGesto();
   }
 
   // ---------- Modos (desenhar / apagar) ----------
@@ -155,7 +269,7 @@ export class Tinta {
     if (modo === 'desenhar') {
       const ferramenta = this.ferramenta === 'borracha' ? 'caneta' : this.ferramenta;
       g.traco = { ferramenta, pontos: [], caixa: null, apagado: false };
-      g.px = []; // pontos do traço em pixels
+      g.pincel = new Pincel(this.traco.ctx, FERRAMENTAS[ferramenta], this.w);
     } else {
       g.apagados = new Set();
       g.ultimo = null;
@@ -198,7 +312,7 @@ export class Tinta {
       this.quadroPedido = false;
       if (!this.gesto) return;
       this.processarPendentes();
-      this.desenharPrevisao();
+      this.desenharExtra();
     });
   }
 
@@ -208,12 +322,9 @@ export class Tinta {
     const pontos = g.pendentes;
     g.pendentes = [];
     if (g.modo === 'desenhar') {
-      const estilo = FERRAMENTAS[g.traco.ferramenta];
       for (const pt of pontos) {
-        g.traco.pontos.push([pt.x / this.w, pt.y / this.h, round3(pt.p)]);
-        g.px.push(pt);
-        // só o segmento novo
-        if (g.px.length >= 2) this.segmento(this.traco.ctx, estilo, g.px, g.px.length - 1);
+        g.traco.pontos.push([round4(pt.x / this.w), round4(pt.y / this.h), round3(pt.p)]);
+        g.pincel.adicionar(pt); // só o trecho novo
       }
     } else {
       let mudou = false;
@@ -225,18 +336,18 @@ export class Tinta {
     }
   }
 
-  desenharPrevisao() {
+  desenharExtra() {
     const g = this.gesto;
-    const ctx = this.previsao.ctx;
+    const ctx = this.extra.ctx;
     ctx.clearRect(0, 0, this.w, this.h);
     if (g.modo === 'desenhar') {
-      const ultimo = g.px[g.px.length - 1];
-      if (!ultimo || !g.previstos.length) return;
-      const estilo = FERRAMENTAS[g.traco.ferramenta];
-      ctx.strokeStyle = estilo.cor;
-      ctx.lineWidth = this.largura(estilo, ultimo.p);
+      if (!PREVISAO || !g.previstos.length || !g.pincel.ultimo) return;
+      const ult = g.pincel.ultimo;
+      ctx.strokeStyle = g.pincel.cor;
+      ctx.lineWidth = ult.r * 2;
+      ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(ultimo.x, ultimo.y);
+      ctx.moveTo(ult.x, ult.y);
       for (const pt of g.previstos) ctx.lineTo(pt.x, pt.y);
       ctx.stroke();
     } else if (g.ultimo) {
@@ -248,48 +359,11 @@ export class Tinta {
     }
   }
 
-  // ---------- Desenho ----------
-
-  largura(estilo, pressao) {
-    return estilo.largura * this.w * (0.7 + 0.6 * pressao); // pressão influencia levemente
-  }
-
-  /** Desenha o pedaço do traço que termina no ponto i (curva pelos pontos médios). */
-  segmento(ctx, estilo, px, i) {
-    const a = px[i - 1], b = px[i];
-    ctx.strokeStyle = estilo.cor;
-    ctx.lineWidth = this.largura(estilo, (a.p + b.p) / 2);
-    ctx.beginPath();
-    if (i === 1) {
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo((a.x + b.x) / 2, (a.y + b.y) / 2);
-    } else {
-      const z = px[i - 2];
-      ctx.moveTo((z.x + a.x) / 2, (z.y + a.y) / 2);
-      ctx.quadraticCurveTo(a.x, a.y, (a.x + b.x) / 2, (a.y + b.y) / 2);
-    }
-    ctx.stroke();
-  }
-
-  /** Desenha um traço inteiro (mesmo algoritmo do desenho ao vivo). */
+  /** Desenha um traço inteiro com o mesmo pincel do desenho ao vivo. */
   tracarCompleto(ctx, t) {
-    const estilo = FERRAMENTAS[t.ferramenta];
-    const px = t.pontos.map(([x, y, p]) => ({ x: x * this.w, y: y * this.h, p }));
-    if (px.length === 1) {
-      ctx.fillStyle = estilo.cor;
-      ctx.beginPath();
-      ctx.arc(px[0].x, px[0].y, this.largura(estilo, px[0].p) / 2, 0, Math.PI * 2);
-      ctx.fill();
-      return;
-    }
-    for (let i = 1; i < px.length; i++) this.segmento(ctx, estilo, px, i);
-    // remate: do último ponto médio até o último ponto
-    const a = px[px.length - 2], b = px[px.length - 1];
-    ctx.lineWidth = this.largura(estilo, b.p);
-    ctx.beginPath();
-    ctx.moveTo((a.x + b.x) / 2, (a.y + b.y) / 2);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
+    const pincel = new Pincel(ctx, FERRAMENTAS[t.ferramenta] || FERRAMENTAS.caneta, this.w);
+    for (const [x, y, p] of t.pontos) pincel.adicionar({ x: x * this.w, y: y * this.h, p });
+    pincel.terminar();
   }
 
   // ---------- Borracha (apaga o traço inteiro tocado) ----------
@@ -354,9 +428,23 @@ export class Tinta {
     this.notificar();
   }
 
-  /** Traços visíveis, prontos para salvar (usado na Etapa 3). */
+  // ---------- Salvar / carregar ----------
+
+  /** Traços visíveis, prontos para salvar. */
   exportar() {
     return this.tracos.filter(t => !t.apagado).map(({ ferramenta, pontos }) => ({ ferramenta, pontos }));
+  }
+
+  /** Substitui a tinta pelos traços salvos (o histórico de desfazer começa do zero). */
+  importar(tracos) {
+    this.tracos = (tracos || [])
+      .filter(t => t && Array.isArray(t.pontos) && t.pontos.length)
+      .map(t => ({ ferramenta: t.ferramenta in FERRAMENTAS ? t.ferramenta : 'caneta',
+                   pontos: t.pontos, caixa: caixaDe(t.pontos), apagado: false }));
+    this.historico = [];
+    this.refazerPilha = [];
+    this.aoMudarHistorico(false, false);
+    this.redesenharBase();
   }
 }
 
@@ -380,3 +468,4 @@ function distSegmento(px, py, ax, ay, bx, by) {
 }
 
 const round3 = v => Math.round(v * 1000) / 1000;
+const round4 = v => Math.round(v * 10000) / 10000;

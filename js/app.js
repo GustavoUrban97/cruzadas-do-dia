@@ -1,14 +1,14 @@
 // Inicialização e escolha do puzzle por data.
 
 // ?v=N: mesmo número usado em index.html (veja o comentário lá).
-import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre } from './datas.js?v=5';
-import { renderizarGrade, ajustarTamanho } from './grade.js?v=5';
-import { Tinta } from './tinta.js?v=5';
-import { iniciarDiagnostico } from './diagnostico.js?v=5';
+import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre } from './datas.js?v=6';
+import { renderizarGrade, ajustarTamanho } from './grade.js?v=6';
+import { Tinta } from './tinta.js?v=6';
+import { iniciarDiagnostico } from './diagnostico.js?v=6';
 
 // Versão do app, mostrada discretamente no cabeçalho (ajuda a saber se o tablet
 // pegou a versão nova ou está abrindo uma antiga do cache).
-const VERSAO = 5;
+const VERSAO = 6;
 
 const $ = id => document.getElementById(id);
 const parametros = new URLSearchParams(location.search);
