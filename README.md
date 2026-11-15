@@ -1,6 +1,6 @@
 # Cruzadas do Dia
 
-Palavras cruzadas diárias para resolver à caneta (S Pen) no Galaxy Tab S9, como a cruzada do jornal. Um puzzle novo por dia, trocando à meia-noite de Brasília.
+Palavras cruzadas diárias no estilo **cruzada direta** (dicas dentro da grade, com setas), para resolver à caneta (S Pen) no Galaxy Tab S9, como na revista. Grade de 13×17, um puzzle novo por dia, trocando à meia-noite de Brasília.
 
 App web estático (HTML, CSS e JavaScript puro), publicado no GitHub Pages e instalável como PWA.
 
@@ -16,8 +16,8 @@ Abra `http://localhost:8000`. Para abrir um dia específico: `http://localhost:8
 
 ## Adicionar puzzles
 
-1. Crie `puzzles/AAAA-MM-DD.json` seguindo o formato de `puzzles/2026-11-07.json` (`#` = casa preta, letras maiúsculas sem acento).
-2. Rode `python3 tools/validar.py`. Ele confere grade, dicas e numeração e regenera `puzzles/index.json`.
+1. Crie `puzzles/AAAA-MM-DD.json` seguindo o formato de `puzzles/2026-11-07.json`: grade 13×17, `#` = casa de dica, letras maiúsculas sem acento. Cada dica diz em que casa fica (`linha`, `coluna`) e a direção da seta (`direita`, `baixo`, `baixo-direita` ou `direita-baixo`); no máximo 2 dicas por casa. Detalhes no `CLAUDE.md`.
+2. Rode `python3 tools/validar.py`. Ele confere se toda palavra tem dica, se as setas e respostas batem com a grade e regenera `puzzles/index.json`.
 3. Faça commit e push. O GitHub Actions valida de novo a cada push.
 
 ## Instalar no tablet

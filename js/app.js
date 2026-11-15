@@ -1,7 +1,7 @@
 // Inicialização e escolha do puzzle por data.
 
 import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre } from './datas.js';
-import { renderizarGrade, renderizarDicas } from './grade.js';
+import { renderizarGrade, ajustarTamanho } from './grade.js';
 
 const $ = id => document.getElementById(id);
 
@@ -46,7 +46,10 @@ async function iniciar() {
     }
 
     renderizarGrade($('grade'), puzzle);
-    renderizarDicas($('dicas'), puzzle);
+    const ajustar = () => ajustarTamanho($('grade'), $('folha'), puzzle);
+    ajustar();
+    // Girar a tela ou redimensionar a janela: recalcula o tamanho das casas.
+    new ResizeObserver(() => requestAnimationFrame(ajustar)).observe($('folha'));
   } catch (erro) {
     console.error(erro);
     $('folha').innerHTML = '';

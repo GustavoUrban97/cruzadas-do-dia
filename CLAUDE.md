@@ -2,6 +2,8 @@
 
 App web pessoal de palavras cruzadas diárias, feito para ser resolvido **à caneta (S Pen) no Samsung Galaxy Tab S9**, com a sensação de fazer a cruzada do jornal no papel. Um puzzle novo por dia, trocando à 00h (horário de Brasília), no espírito do Termo.
 
+O estilo é **cruzada direta** (como as revistas de banca): as dicas ficam dentro da grade, em casas próprias, com uma seta indicando onde a resposta começa e em que direção corre. Não há lista de dicas separada nem numeração.
+
 Publicado no **GitHub Pages** (repositório público) e instalado no tablet como PWA ("Adicionar à tela inicial" no Chrome). Uso exclusivamente pessoal: sem login, sem backend, sem servidor próprio.
 
 ## Como trabalhar neste projeto
@@ -15,7 +17,7 @@ Publicado no **GitHub Pages** (repositório público) e instalado no tablet como
 ## Princípio central: é papel, não formulário
 
 - O app **não reconhece** a escrita e **não valida** respostas durante o jogo. Ele só guarda os traços.
-- A grade e a coluna de dicas são uma folha onde se desenha livremente: letra no quadrado, palpite pequeno no canto, rabisco, riscar dica resolvida.
+- A grade é uma folha onde se desenha livremente: letra no quadrado, palpite pequeno no canto, rabisco, riscar a dica resolvida na própria casa de dica.
 - Conferir é como no jornal: o **gabarito de ontem** fica disponível no dia seguinte, e há um botão **Revelar** opcional para o puzzle atual.
 
 ## Stack
@@ -33,7 +35,7 @@ manifest.webmanifest
 sw.js
 css/estilo.css
 js/app.js          # inicialização, roteamento por data
-js/grade.js        # renderiza grade e dicas, calcula numeração
+js/grade.js        # renderiza a grade com as casas de dica e as setas
 js/tinta.js        # captura e desenho dos traços
 js/armazenamento.js# IndexedDB
 js/datas.js        # "hoje" em America/Sao_Paulo, formatação
@@ -67,11 +69,12 @@ Usar **Pointer Events** (`pointerType`):
 
 ## Layout
 
-- Paisagem: grade à esquerda (o maior possível), dicas à direita. Retrato: grade em cima, dicas embaixo.
-- Visual de jornal: fundo papel (off-white), linhas finas pretas, casas pretas sólidas, números pequenos no canto superior esquerdo, dicas em fonte serifada, títulos "Horizontais" e "Verticais".
-- Uma camada de tinta cobrindo grade e dicas (as duas áreas aceitam escrita).
-- Traços salvos em **coordenadas normalizadas** relativas à área em que foram feitos (grade ou dicas), para continuarem no lugar ao girar a tela ou redimensionar.
-- Cabeçalho: data por extenso ("domingo, 15 de novembro de 2026") e número do puzzle.
+- **Retrato é a orientação principal.** A grade (sempre 13×17) ocupa a tela toda; as casas podem ser um pouco mais altas que largas, como na revista. Em paisagem a grade fica centralizada (menor), sobrando a lateral para a barra de ferramentas.
+- Visual de revista: fundo papel (off-white), linhas finas pretas, **casas de dica em cinza bem claro** com texto pequeno centralizado em fonte serifada. Casa com duas dicas: dividida ao meio por linha tracejada, uma dica em cada metade.
+- Setas pequenas na borda da casa onde a resposta começa, sem atrapalhar a escrita da letra.
+- A camada de tinta cobre a grade inteira (casas de letra e de dica aceitam escrita).
+- Traços salvos em **coordenadas normalizadas** relativas à grade, para continuarem no lugar ao girar a tela ou redimensionar.
+- Cabeçalho compacto (uma linha): data por extenso ("domingo, 15 de novembro de 2026") e número do puzzle.
 - Sem rolagem acidental nem zoom do navegador ao escrever (`user-scalable=no` no viewport é aceitável aqui).
 
 ## Ciclo diário
@@ -102,33 +105,36 @@ Usar **Pointer Events** (`pointerType`):
 {
   "id": 1,
   "data": "2026-11-07",
-  "titulo": "Mini do sábado",
+  "titulo": "Direta do sábado",
   "autor": "Gustavo",
-  "largura": 5,
-  "altura": 5,
-  "grade": ["#SOPA", "SABES", "ENTRA", "ITENS", "SARA#"],
-  "dicas": {
-    "horizontais": [
-      { "numero": 1, "texto": "Caldo servido quente na entrada do jantar", "resposta": "SOPA" }
-    ],
-    "verticais": [
-      { "numero": 1, "texto": "___ Catarina, estado do Sul", "resposta": "SANTA" }
-    ]
-  }
+  "largura": 13,
+  "altura": 17,
+  "grade": ["#############", "#SOPA#......", "..."],
+  "dicas": [
+    { "linha": 1, "coluna": 0, "direcao": "direita", "texto": "Caldo quente", "resposta": "SOPA" },
+    { "linha": 0, "coluna": 1, "direcao": "baixo", "texto": "___ Catarina", "resposta": "SANTA" }
+  ]
 }
 ```
 
-- `#` = casa preta. Letras maiúsculas sem acento (padrão de cruzadas brasileiras).
-- A numeração é **calculada pelo app** a partir da grade (numera a casa que inicia palavra horizontal ou vertical de 2+ letras). O `numero` das dicas deve bater; o validador confere.
-- Tamanhos: 5×5 no início, mas o layout não deve assumir 5×5 (prever até 15×15).
+- **Tamanho fixo: 13 colunas × 17 linhas**, todo dia.
+- `#` = casa de dica. Casa `#` sem nenhuma dica aparece como casa preta. Letras maiúsculas sem acento (padrão de cruzadas brasileiras).
+- Cada dica fica na casa `(linha, coluna)`, que precisa ser `#`. No máximo **2 dicas por casa**; a primeira da lista ocupa a metade de cima.
+- `direcao` (de onde começa a resposta, a partir da casa da dica):
+  - `direita` (→): começa na casa à direita e corre para a direita.
+  - `baixo` (↓): começa na casa de baixo e desce.
+  - `baixo-direita` (↳): começa na casa de baixo e corre para a direita.
+  - `direita-baixo` (↴): começa na casa à direita e desce.
+- A resposta vai até a próxima casa `#` ou a borda.
+- Dicas curtas (idealmente até ~20 caracteres, 1 a 3 palavras), para caberem na casinha.
 - O repositório é público, então as respostas ficam visíveis no código. Isso é aceito; não é preciso ofuscar.
 
 ## Conteúdo: pasta `tools/`
 
 Scripts Python, fora do app:
 
-1. `validar.py` — lê todos os JSON de `puzzles/` e falha se: linhas da grade com tamanhos diferentes; palavra da grade sem dica (ou vice-versa); `resposta` não bate com a grade; numeração não bate; palavra repetida no mesmo puzzle; datas duplicadas ou nome do arquivo diferente do campo `data`. Ao final, **regenera `puzzles/index.json`** com a lista ordenada de datas.
-2. `gerar_grade.py` — preenche um padrão de casas pretas com palavras comuns em português (lista de frequência, por exemplo o pacote `wordfreq`, removendo acentos), sem repetir palavras, e gera o JSON com as dicas em branco para eu (ou uma IA) escrever.
+1. `validar.py` — lê todos os JSON de `puzzles/` e falha se: grade diferente de 13×17; caractere inválido; dica fora de casa `#` ou apontando para casa que não é letra; mais de 2 dicas na mesma casa; palavra da grade (2+ letras) sem dica, ou com mais de uma; `resposta` não bate com a grade; palavra repetida no mesmo puzzle; datas duplicadas ou nome do arquivo diferente do campo `data`. Avisa (sem falhar) sobre dicas longas demais. Ao final, **regenera `puzzles/index.json`** com a lista ordenada de datas.
+2. `gerar_grade.py` — monta um padrão 13×17 de casas de dica e preenche com palavras comuns em português (lista de frequência, por exemplo o pacote `wordfreq`, removendo acentos), sem repetir palavras, atribui cada palavra a uma casa de dica vizinha (no máximo 2 por casa) e gera o JSON com os textos das dicas em branco para eu (ou uma IA) escrever.
 3. Dicas escritas em lotes (um mês por vez) e revisadas por mim. Não copiar puzzles de revistas, jornais ou apps.
 
 ## GitHub Pages e CI
@@ -140,7 +146,7 @@ Scripts Python, fora do app:
 
 ## Etapas
 
-1. **Esqueleto:** estrutura de pastas, `index.html`, leitura do puzzle de exemplo, grade e dicas em estilo jornal (sem tinta), cálculo de "hoje" em Brasília. `tools/validar.py` e o workflow. Publicar no Pages e abrir no tablet.
+1. **Esqueleto:** estrutura de pastas, `index.html`, leitura do puzzle de exemplo, grade no formato direta (sem tinta), cálculo de "hoje" em Brasília. `tools/validar.py` e o workflow. Publicar no Pages e abrir no tablet.
 2. **Tinta:** desenho com caneta, rejeição de palma, borracha (ferramenta e botão), lápis, desfazer/refazer, pressão, tela de diagnóstico `?debug=1`. Testar latência no Tab S9.
 3. **Persistência e ciclo diário:** IndexedDB por data, virada da meia-noite, fallback de puzzle.
 4. **PWA:** manifest, ícones, service worker, offline, aviso de atualização.

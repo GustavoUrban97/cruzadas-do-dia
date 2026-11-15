@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Valida todos os puzzles de puzzles/ e regenera puzzles/index.json.
+"""Valida todos os puzzles (formato cruzada direta) e regenera puzzles/index.json.
 
 Uso:  python3 tools/validar.py
 
-Sai com código 1 se algum puzzle estiver inválido. A regra de numeração
-é a mesma de js/grade.js (calcularNumeracao); as duas precisam bater.
+Sai com código 1 se algum puzzle estiver inválido. A regra de onde cada
+resposta começa é a mesma de js/grade.js (DIRECOES); as duas precisam bater.
 """
 
 import json
@@ -15,124 +15,136 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 PASTA = RAIZ / "puzzles"
 INDICE = PASTA / "index.json"
-PRETA = "#"
+
+LARGURA, ALTURA = 13, 17
+DICA = "#"
+MAX_DICAS_POR_CASA = 2
+DICA_LONGA = 24  # caracteres; acima disso só avisa
+
 NOME_ARQUIVO = re.compile(r"^\d{4}-\d{2}-\d{2}\.json$")
 LINHA_VALIDA = re.compile(r"^[A-Z#]+$")
 
+# direcao -> (deslocamento até a 1ª letra, sentido da palavra)
+DIRECOES = {
+    "direita":       ((0, 1), (0, 1)),
+    "baixo":         ((1, 0), (1, 0)),
+    "baixo-direita": ((1, 0), (0, 1)),
+    "direita-baixo": ((0, 1), (1, 0)),
+}
 
-def calcular_numeracao(grade):
-    """Retorna (horizontais, verticais): listas de (numero, resposta)."""
+
+def palavras_da_grade(grade):
+    """Todas as palavras (2+ letras) da grade: {(linha, coluna, sentido): palavra}."""
     altura, largura = len(grade), len(grade[0])
 
-    def eh_letra(l, c):
-        return 0 <= l < altura and 0 <= c < largura and grade[l][c] != PRETA
+    def letra(l, c):
+        return 0 <= l < altura and 0 <= c < largura and grade[l][c] != DICA
 
-    def ler(l, c, dl, dc):
-        palavra = ""
-        while eh_letra(l, c):
-            palavra += grade[l][c]
-            l, c = l + dl, c + dc
-        return palavra
-
-    horizontais, verticais = [], []
-    proximo = 1
+    palavras = {}
     for l in range(altura):
         for c in range(largura):
-            if not eh_letra(l, c):
-                continue
-            inicia_h = not eh_letra(l, c - 1) and eh_letra(l, c + 1)
-            inicia_v = not eh_letra(l - 1, c) and eh_letra(l + 1, c)
-            if not (inicia_h or inicia_v):
-                continue
-            if inicia_h:
-                horizontais.append((proximo, ler(l, c, 0, 1)))
-            if inicia_v:
-                verticais.append((proximo, ler(l, c, 1, 0)))
-            proximo += 1
-    return horizontais, verticais
-
-
-def conferir_dicas(nome_lista, esperadas, dicas, erros):
-    if not isinstance(dicas, list):
-        erros.append(f"dicas.{nome_lista} precisa ser uma lista")
-        return
-    por_numero = {}
-    for dica in dicas:
-        numero = dica.get("numero")
-        if numero in por_numero:
-            erros.append(f"{nome_lista}: número {numero} aparece em duas dicas")
-        por_numero[numero] = dica
-        if not str(dica.get("texto", "")).strip():
-            erros.append(f"{nome_lista} {numero}: texto da dica vazio")
-
-    numeros_grade = {n for n, _ in esperadas}
-    for numero, palavra in esperadas:
-        dica = por_numero.get(numero)
-        if dica is None:
-            erros.append(f"{nome_lista} {numero} ({palavra}): palavra da grade sem dica")
-        elif dica.get("resposta") != palavra:
-            erros.append(
-                f"{nome_lista} {numero}: resposta \"{dica.get('resposta')}\" "
-                f"não bate com a grade (\"{palavra}\")"
-            )
-    for numero in por_numero:
-        if numero not in numeros_grade:
-            erros.append(f"{nome_lista} {numero}: dica sem palavra correspondente na grade")
-
-    ordem = [d.get("numero") for d in dicas]
-    if ordem != sorted(ordem, key=lambda x: (x is None, x)):
-        erros.append(f"{nome_lista}: dicas fora de ordem numérica")
+            for sentido in ((0, 1), (1, 0)):
+                dl, dc = sentido
+                if not letra(l, c) or letra(l - dl, c - dc):
+                    continue  # não é início de sequência
+                palavra, ll, cc = "", l, c
+                while letra(ll, cc):
+                    palavra += grade[ll][cc]
+                    ll, cc = ll + dl, cc + dc
+                if len(palavra) >= 2:
+                    palavras[(l, c, sentido)] = palavra
+    return palavras
 
 
 def validar_puzzle(caminho):
-    """Retorna (puzzle ou None, lista de erros)."""
-    erros = []
+    """Retorna (puzzle ou None, erros, avisos)."""
+    erros, avisos = [], []
     try:
         puzzle = json.loads(caminho.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
-        return None, [f"JSON inválido: {e}"]
+        return None, [f"JSON inválido: {e}"], avisos
 
     for campo in ("id", "data", "titulo", "largura", "altura", "grade", "dicas"):
         if campo not in puzzle:
             erros.append(f"campo obrigatório ausente: {campo}")
     if erros:
-        return puzzle, erros
+        return puzzle, erros, avisos
 
     if caminho.stem != puzzle["data"]:
         erros.append(f"nome do arquivo ({caminho.stem}) diferente do campo data ({puzzle['data']})")
 
     grade = puzzle["grade"]
-    if not isinstance(grade, list) or not grade:
-        return puzzle, erros + ["grade vazia ou não é lista"]
-
-    tamanhos = {len(linha) for linha in grade}
-    if len(tamanhos) != 1:
-        return puzzle, erros + [f"linhas da grade com tamanhos diferentes: {sorted(tamanhos)}"]
-    if len(grade) != puzzle["altura"]:
-        erros.append(f"altura {puzzle['altura']} mas a grade tem {len(grade)} linhas")
-    if len(grade[0]) != puzzle["largura"]:
-        erros.append(f"largura {puzzle['largura']} mas as linhas têm {len(grade[0])} casas")
-    if not (2 <= len(grade) <= 15 and 2 <= len(grade[0]) <= 15):
-        erros.append("tamanho fora do limite (até 15×15)")
+    if (puzzle["largura"], puzzle["altura"]) != (LARGURA, ALTURA):
+        erros.append(f"tamanho deve ser {LARGURA}×{ALTURA} (largura × altura)")
+    if not isinstance(grade, list) or len(grade) != ALTURA:
+        return puzzle, erros + [f"a grade precisa ter {ALTURA} linhas"], avisos
     for i, linha in enumerate(grade):
-        if not LINHA_VALIDA.match(linha):
-            erros.append(f"linha {i + 1} (\"{linha}\"): use só A-Z maiúsculas sem acento e #")
+        if len(linha) != LARGURA:
+            erros.append(f"linha {i}: tem {len(linha)} casas, deveria ter {LARGURA}")
+        elif not LINHA_VALIDA.match(linha):
+            erros.append(f"linha {i} (\"{linha}\"): use só A-Z maiúsculas sem acento e #")
     if erros:
-        return puzzle, erros
+        return puzzle, erros, avisos
 
-    horizontais, verticais = calcular_numeracao(grade)
+    palavras = palavras_da_grade(grade)
+    cobertas = {}
+    por_casa = {}
+
     dicas = puzzle["dicas"]
-    conferir_dicas("horizontais", horizontais, dicas.get("horizontais"), erros)
-    conferir_dicas("verticais", verticais, dicas.get("verticais"), erros)
+    if not isinstance(dicas, list):
+        return puzzle, erros + ["dicas precisa ser uma lista"], avisos
 
-    vistas = {}
-    for _, palavra in horizontais + verticais:
-        vistas[palavra] = vistas.get(palavra, 0) + 1
-    repetidas = sorted(p for p, n in vistas.items() if n > 1)
+    for i, dica in enumerate(dicas):
+        l, c = dica.get("linha"), dica.get("coluna")
+        direcao = dica.get("direcao")
+        nome = f"dica ({l},{c}) {direcao}"
+        if not (isinstance(l, int) and isinstance(c, int) and 0 <= l < ALTURA and 0 <= c < LARGURA):
+            erros.append(f"dica {i}: linha/coluna fora da grade")
+            continue
+        if grade[l][c] != DICA:
+            erros.append(f"{nome}: a casa ({l},{c}) não é casa de dica (#)")
+            continue
+        if direcao not in DIRECOES:
+            erros.append(f"{nome}: direção inválida (use {', '.join(DIRECOES)})")
+            continue
+
+        por_casa[(l, c)] = por_casa.get((l, c), 0) + 1
+
+        texto = str(dica.get("texto", "")).strip()
+        if not texto:
+            erros.append(f"{nome}: texto da dica vazio")
+        elif len(texto) > DICA_LONGA:
+            avisos.append(f"{nome}: dica com {len(texto)} caracteres pode não caber (\"{texto}\")")
+
+        (ol, oc), sentido = DIRECOES[direcao]
+        inicio = (l + ol, c + oc, sentido)
+        palavra = palavras.get(inicio)
+        if palavra is None:
+            erros.append(f"{nome}: a seta não aponta para o início de uma palavra de 2+ letras")
+            continue
+        if inicio in cobertas:
+            erros.append(f"{nome}: a palavra {palavra} já tem dica em {cobertas[inicio]}")
+        cobertas[inicio] = nome
+        if dica.get("resposta") != palavra:
+            erros.append(f"{nome}: resposta \"{dica.get('resposta')}\" não bate com a grade (\"{palavra}\")")
+
+    for (l, c), n in por_casa.items():
+        if n > MAX_DICAS_POR_CASA:
+            erros.append(f"casa ({l},{c}) tem {n} dicas (máximo {MAX_DICAS_POR_CASA})")
+
+    for (l, c, sentido), palavra in sorted(palavras.items()):
+        if (l, c, sentido) not in cobertas:
+            onde = "horizontal" if sentido == (0, 1) else "vertical"
+            erros.append(f"palavra {palavra} ({onde}, começa em {l},{c}) está sem dica")
+
+    contagem = {}
+    for palavra in palavras.values():
+        contagem[palavra] = contagem.get(palavra, 0) + 1
+    repetidas = sorted(p for p, n in contagem.items() if n > 1)
     if repetidas:
         erros.append(f"palavra repetida no puzzle: {', '.join(repetidas)}")
 
-    return puzzle, erros
+    return puzzle, erros, avisos
 
 
 def main():
@@ -145,7 +157,7 @@ def main():
         erros = []
         if not NOME_ARQUIVO.match(caminho.name):
             erros.append("nome do arquivo deve ser AAAA-MM-DD.json")
-        puzzle, erros_puzzle = validar_puzzle(caminho)
+        puzzle, erros_puzzle, avisos = validar_puzzle(caminho)
         erros += erros_puzzle
 
         if puzzle and "id" in puzzle:
@@ -153,13 +165,14 @@ def main():
                 erros.append(f"id {puzzle['id']} repetido (também em {ids[puzzle['id']]})")
             ids.setdefault(puzzle["id"], caminho.name)
 
+        print(f"{'✗' if erros else '✓'} {caminho.name}")
+        for erro in erros:
+            print(f"    - {erro}")
+        for aviso in avisos:
+            print(f"    ! {aviso}")
         if erros:
             problemas += 1
-            print(f"✗ {caminho.name}")
-            for erro in erros:
-                print(f"    - {erro}")
         else:
-            print(f"✓ {caminho.name}")
             datas.append(puzzle["data"])
 
     if len(datas) != len(set(datas)):
