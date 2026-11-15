@@ -1,0 +1,191 @@
+/* Cruzadas do Dia — visual de jornal */
+
+:root {
+  --papel: #f6f1e4;
+  --tinta: #1a1a1a;
+  --tinta-suave: #5a5650;
+  --linha: #1a1a1a;
+  --serifa: Georgia, "Noto Serif", "Times New Roman", serif;
+  --altura-cabecalho: 4.5rem;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: var(--serifa);
+  /* Sem seleção de texto nem menu de toque longo: é papel. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ---------- Cabeçalho ---------- */
+
+.cabecalho {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1.25rem 0.5rem;
+  border-bottom: 2px solid var(--linha);
+  min-height: var(--altura-cabecalho);
+}
+
+.nome {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.data {
+  margin: 0;
+  font-style: italic;
+  color: var(--tinta-suave);
+}
+
+.edicao {
+  margin: 0 0 0 auto;
+  font-size: 0.95rem;
+  color: var(--tinta-suave);
+}
+
+.aviso {
+  margin: 0;
+  padding: 0.4rem 1.25rem;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--tinta-suave);
+  border-bottom: 1px solid #d8d0bd;
+}
+
+/* ---------- Folha: grade + dicas ---------- */
+
+.folha {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 1.5rem;
+  padding: 1.25rem;
+}
+
+/* Paisagem: grade à esquerda, dicas à direita */
+@media (orientation: landscape) {
+  .folha { grid-template-columns: auto 1fr; }
+  .grade { width: min(60vw, calc(100dvh - var(--altura-cabecalho) - 3rem)); }
+}
+
+/* Retrato: grade em cima, dicas embaixo */
+@media (orientation: portrait) {
+  .folha { grid-template-rows: auto 1fr; justify-items: center; }
+  .grade { width: min(calc(100vw - 2.5rem), 60dvh); }
+  .area-dicas { width: 100%; }
+}
+
+.area-grade {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+/* ---------- Grade ---------- */
+
+.grade {
+  --n-colunas: 5;
+  --n-linhas: 5;
+  display: grid;
+  grid-template-columns: repeat(var(--n-colunas), 1fr);
+  grid-template-rows: repeat(var(--n-linhas), 1fr);
+  aspect-ratio: var(--n-colunas) / var(--n-linhas);
+  gap: 1px;
+  padding: 2px;
+  background: var(--linha);       /* o fundo vira as linhas finas */
+  container-type: inline-size;    /* números proporcionais à grade */
+}
+
+.casa {
+  position: relative;
+  background: var(--papel);
+}
+
+.casa.preta { background: var(--linha); }
+
+.casa .numero {
+  position: absolute;
+  top: 3%;
+  left: 5%;
+  font-size: calc(100cqw / var(--n-colunas) * 0.24);
+  line-height: 1;
+  font-family: var(--serifa);
+}
+
+/* Letras reveladas (usado a partir da Etapa 5) */
+.casa .letra {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: calc(100cqw / var(--n-colunas) * 0.6);
+}
+
+/* ---------- Dicas ---------- */
+
+.area-dicas {
+  overflow-y: auto;
+  min-height: 0;
+  columns: 2 16rem;
+  column-gap: 2rem;
+}
+
+.bloco-dicas {
+  break-inside: avoid;
+  margin-bottom: 1.25rem;
+}
+
+.bloco-dicas h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--linha);
+  padding-bottom: 0.2rem;
+}
+
+.bloco-dicas ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bloco-dicas li {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  gap: 0.25rem;
+  padding: 0.45rem 0;
+  font-size: 1.1rem;
+  line-height: 1.35;
+}
+
+.bloco-dicas .num {
+  font-weight: 700;
+  text-align: right;
+  padding-right: 0.35rem;
+}
+
+.bloco-dicas .tamanho { color: var(--tinta-suave); }
+
+.erro {
+  padding: 2rem;
+  font-style: italic;
+}

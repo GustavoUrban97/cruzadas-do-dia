@@ -1,0 +1,31 @@
+{
+  "id": 1,
+  "data": "2026-11-07",
+  "titulo": "Mini do sábado",
+  "autor": "Gustavo",
+  "largura": 5,
+  "altura": 5,
+  "grade": [
+    "#SOPA",
+    "SABES",
+    "ENTRA",
+    "ITENS",
+    "SARA#"
+  ],
+  "dicas": {
+    "horizontais": [
+      { "numero": 1, "texto": "Caldo servido quente na entrada do jantar", "resposta": "SOPA" },
+      { "numero": 5, "texto": "\"Tu ___ o caminho?\" (verbo saber)", "resposta": "SABES" },
+      { "numero": 6, "texto": "O contrário de \"sai\"", "resposta": "ENTRA" },
+      { "numero": 7, "texto": "Elementos de uma lista", "resposta": "ITENS" },
+      { "numero": 8, "texto": "Cicatriza, fica curada (a ferida)", "resposta": "SARA" }
+    ],
+    "verticais": [
+      { "numero": 1, "texto": "___ Catarina, estado do Sul", "resposta": "SANTA" },
+      { "numero": 2, "texto": "Conseguir, alcançar", "resposta": "OBTER" },
+      { "numero": 3, "texto": "Membro que dobra no joelho", "resposta": "PERNA" },
+      { "numero": 4, "texto": "O que o avião e o passarinho têm em comum", "resposta": "ASAS" },
+      { "numero": 5, "texto": "Metade de uma dúzia", "resposta": "SEIS" }
+    ]
+  }
+}
