@@ -99,6 +99,44 @@ body {
 
 .ferramentas button:disabled { opacity: 0.3; cursor: default; }
 
+/* Bolinhas de cor da caneta */
+.cores {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 4px;
+}
+
+.ferramentas button.cor {
+  width: 30px;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  position: relative;
+}
+
+.ferramentas button.cor::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--cor);
+}
+
+.ferramentas button.cor.escolhida::before {
+  width: 18px;
+  height: 18px;
+  box-shadow: 0 0 0 2px var(--papel), 0 0 0 3.5px var(--cor);
+}
+
+.cor[data-cor="preta"]    { --cor: #1a1a1a; }
+.cor[data-cor="azul"]     { --cor: #1f3d8f; }
+.cor[data-cor="vermelha"] { --cor: #b3261e; }
+
 .ferramentas .separador {
   width: 1px;
   height: 24px;

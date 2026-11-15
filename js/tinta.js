@@ -14,6 +14,20 @@ export const FERRAMENTAS = {
   caneta: { cor: '#1a1a1a', largura: 0.0034 },
   lapis:  { cor: '#8a867e', largura: 0.0022 },
 };
+
+// Cores da caneta (tons de caneta esferográfica, não de tela). O lápis é sempre cinza.
+export const CORES_CANETA = {
+  preta:    '#1a1a1a',
+  azul:     '#1f3d8f',
+  vermelha: '#b3261e',
+};
+
+/** Estilo (cor + largura) de um traço; traços antigos sem cor saem pretos. */
+function estiloDo(traco) {
+  const base = FERRAMENTAS[traco.ferramenta] || FERRAMENTAS.caneta;
+  if (traco.ferramenta !== 'caneta') return base;
+  return { ...base, cor: CORES_CANETA[traco.cor] || CORES_CANETA.preta };
+}
 const RAIO_BORRACHA = 0.014; // fração da largura da grade
 
 // Botões que transformam a caneta em borracha enquanto pressionados.
@@ -163,10 +177,11 @@ export class Tinta {
     this.extra = criarCamada('tinta-extra', true);
     papel.append(this.base.canvas, this.traco.canvas, this.extra.canvas);
 
-    this.tracos = [];        // { ferramenta, pontos: [[x, y, pressao]], caixa, apagado }
+    this.tracos = [];        // { ferramenta, cor?, pontos: [[x, y, pressao]], caixa, apagado }
     this.historico = [];     // { tracos: [...], apagar: bool }
     this.refazerPilha = [];
     this.ferramenta = 'caneta';
+    this.cor = 'preta';      // cor da caneta (chave de CORES_CANETA)
     this.gesto = null;       // gesto em andamento (um ponteiro por vez)
     this.quadroPedido = false;
     this.w = 1; this.h = 1;
@@ -269,7 +284,8 @@ export class Tinta {
     if (modo === 'desenhar') {
       const ferramenta = this.ferramenta === 'borracha' ? 'caneta' : this.ferramenta;
       g.traco = { ferramenta, pontos: [], caixa: null, apagado: false };
-      g.pincel = new Pincel(this.traco.ctx, FERRAMENTAS[ferramenta], this.w);
+      if (ferramenta === 'caneta') g.traco.cor = this.cor;
+      g.pincel = new Pincel(this.traco.ctx, estiloDo(g.traco), this.w);
     } else {
       g.apagados = new Set();
       g.ultimo = null;
@@ -361,7 +377,7 @@ export class Tinta {
 
   /** Desenha um traço inteiro com o mesmo pincel do desenho ao vivo. */
   tracarCompleto(ctx, t) {
-    const pincel = new Pincel(ctx, FERRAMENTAS[t.ferramenta] || FERRAMENTAS.caneta, this.w);
+    const pincel = new Pincel(ctx, estiloDo(t), this.w);
     for (const [x, y, p] of t.pontos) pincel.adicionar({ x: x * this.w, y: y * this.h, p });
     pincel.terminar();
   }
@@ -408,6 +424,10 @@ export class Tinta {
     if (ferramenta in FERRAMENTAS || ferramenta === 'borracha') this.ferramenta = ferramenta;
   }
 
+  usarCor(cor) {
+    if (cor in CORES_CANETA) this.cor = cor;
+  }
+
   desfazer() {
     if (this.gesto) return;
     const acao = this.historico.pop();
@@ -432,15 +452,20 @@ export class Tinta {
 
   /** Traços visíveis, prontos para salvar. */
   exportar() {
-    return this.tracos.filter(t => !t.apagado).map(({ ferramenta, pontos }) => ({ ferramenta, pontos }));
+    return this.tracos.filter(t => !t.apagado)
+      .map(({ ferramenta, cor, pontos }) => (cor ? { ferramenta, cor, pontos } : { ferramenta, pontos }));
   }
 
   /** Substitui a tinta pelos traços salvos (o histórico de desfazer começa do zero). */
   importar(tracos) {
     this.tracos = (tracos || [])
       .filter(t => t && Array.isArray(t.pontos) && t.pontos.length)
-      .map(t => ({ ferramenta: t.ferramenta in FERRAMENTAS ? t.ferramenta : 'caneta',
-                   pontos: t.pontos, caixa: caixaDe(t.pontos), apagado: false }));
+      .map(t => {
+        const ferramenta = t.ferramenta in FERRAMENTAS ? t.ferramenta : 'caneta';
+        const traco = { ferramenta, pontos: t.pontos, caixa: caixaDe(t.pontos), apagado: false };
+        if (ferramenta === 'caneta' && t.cor in CORES_CANETA) traco.cor = t.cor;
+        return traco;
+      });
     this.historico = [];
     this.refazerPilha = [];
     this.aoMudarHistorico(false, false);

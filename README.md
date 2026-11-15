@@ -2,7 +2,7 @@
 
 Palavras cruzadas diárias no estilo **cruzada direta** (dicas dentro da grade, com setas), para resolver à caneta (S Pen) no Galaxy Tab S9, como na revista. Grade de 13×17, um puzzle novo por dia, trocando à meia-noite de Brasília.
 
-App web estático (HTML, CSS e JavaScript puro), publicado no GitHub Pages e instalável como PWA.
+Página web estática (HTML, CSS e JavaScript puro), publicada no GitHub Pages e usada direto no Chrome do tablet. Abre sem internet e avisa quando há versão nova.
 
 ## Rodar localmente
 
@@ -20,7 +20,14 @@ Abra `http://localhost:8000`. Para abrir um dia específico: `http://localhost:8
 2. Rode `python3 tools/validar.py`. Ele confere se toda palavra tem dica, se as setas e respostas batem com a grade e regenera `puzzles/index.json`.
 3. Faça commit e push. O GitHub Actions valida de novo a cada push.
 
-## Instalar no tablet
+## Usar no tablet
 
-1. Abra o endereço do GitHub Pages no Chrome do tablet.
-2. Menu ⋮ → **Adicionar à tela inicial** (disponível como app instalável a partir da Etapa 4).
+Abra https://gustavourban97.github.io/cruzadas-do-dia/ no Chrome. A tinta fica salva neste aparelho e neste navegador.
+
+- Quando aparecer **"Atualização disponível"**, toque para recarregar com a versão nova.
+- `?debug=1` no fim do endereço mostra os eventos da caneta (diagnóstico).
+- `?data=AAAA-MM-DD` abre um dia específico.
+
+## Publicar uma versão nova
+
+A cada mudança em HTML, CSS ou JS, suba a `VERSAO` em `sw.js` e em `js/app.js` (as duas iguais). É isso que faz o tablet perceber a versão nova.

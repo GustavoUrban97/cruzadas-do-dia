@@ -1,15 +1,15 @@
 // Inicialização e escolha do puzzle por data.
 
-// ?v=N: mesmo número usado em index.html (veja o comentário lá).
-import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre } from './datas.js?v=6';
-import { renderizarGrade, ajustarTamanho } from './grade.js?v=6';
-import { Tinta } from './tinta.js?v=6';
-import { iniciarDiagnostico } from './diagnostico.js?v=6';
-import { carregarTinta, salvarTinta, pedirPersistencia } from './armazenamento.js?v=6';
+import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre, somarDias } from './datas.js';
+import { renderizarGrade, ajustarTamanho } from './grade.js';
+import { Tinta } from './tinta.js';
+import { iniciarDiagnostico } from './diagnostico.js';
+import { carregarTinta, salvarTinta, pedirPersistencia } from './armazenamento.js';
 
-// Versão do app, mostrada discretamente no cabeçalho (ajuda a saber se o tablet
-// pegou a versão nova ou está abrindo uma antiga do cache).
-const VERSAO = 6;
+// Versão do app, mostrada discretamente no cabeçalho.
+// IMPORTANTE: precisa ser igual à VERSAO de sw.js, que deve subir a cada mudança
+// em HTML/CSS/JS (é o que faz o tablet perceber que há versão nova).
+const VERSAO = 7;
 
 const $ = id => document.getElementById(id);
 const parametros = new URLSearchParams(location.search);
@@ -54,6 +54,19 @@ function configurarFerramentas(tinta) {
   };
   botoes.forEach(b => b.addEventListener('click', () => escolher(b.dataset.ferramenta)));
   escolher(lerPreferencia('ferramenta', 'caneta'));
+
+  // Cores da caneta: escolher uma cor também ativa a caneta.
+  const cores = [...document.querySelectorAll('[data-cor]')];
+  const escolherCor = (cor, ativarCaneta) => {
+    tinta.usarCor(cor);
+    cores.forEach(b => b.classList.toggle('escolhida', b.dataset.cor === tinta.cor));
+    const escolhida = cores.find(b => b.dataset.cor === tinta.cor);
+    if (escolhida) $('botao-caneta').style.color = getComputedStyle(escolhida).getPropertyValue('--cor');
+    gravarPreferencia('cor', tinta.cor);
+    if (ativarCaneta) escolher('caneta');
+  };
+  cores.forEach(b => b.addEventListener('click', () => escolherCor(b.dataset.cor, true)));
+  escolherCor(lerPreferencia('cor', 'preta'), false);
 
   $('desfazer').addEventListener('click', () => tinta.desfazer());
   $('refazer').addEventListener('click', () => tinta.refazer());
@@ -148,11 +161,66 @@ function vigiarVirada(dataAberta, aoTrocar) {
   });
 }
 
+// ---------- Service worker: abrir sem internet e avisar de versão nova ----------
+
+/**
+ * Registra o sw.js. Quando uma versão nova é publicada, o navegador baixa o sw.js
+ * novo, que fica "esperando"; aí mostramos a faixa. Ao tocar, ele assume e a
+ * página recarrega já com os arquivos novos. Nunca recarrega sozinho.
+ */
+function registrarServiceWorker(antesDeRecarregar) {
+  if (!('serviceWorker' in navigator)) return;
+  let recarregar = false;
+
+  const oferecer = registro => {
+    if (!registro.waiting || !navigator.serviceWorker.controller) return;
+    const faixa = $('atualizacao');
+    faixa.hidden = false;
+    faixa.onclick = async () => {
+      faixa.disabled = true;
+      await antesDeRecarregar();
+      recarregar = true;
+      registro.waiting.postMessage({ tipo: 'atualizar' });
+    };
+  };
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (recarregar) location.reload();
+  });
+
+  navigator.serviceWorker.register('sw.js').then(registro => {
+    oferecer(registro);
+    registro.addEventListener('updatefound', () => {
+      const novo = registro.installing;
+      if (!novo) return;
+      novo.addEventListener('statechange', () => {
+        if (novo.state === 'installed') oferecer(registro);
+      });
+    });
+    // Página aberta por muito tempo: procura versão nova ao voltar para ela.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') registro.update().catch(() => {});
+    });
+  }).catch(erro => console.warn('Service worker não registrado:', erro));
+}
+
+/** Busca os puzzles dos próximos 7 dias para o service worker guardar (uso offline). */
+function precarregarProximos(hoje, datas) {
+  for (let i = 1; i <= 7; i++) {
+    const dia = somarDias(hoje, i);
+    if (datas.includes(dia)) fetch(`puzzles/${dia}.json`, { cache: 'no-cache' }).catch(() => {});
+  }
+}
+
 // ---------- Início ----------
 
 async function iniciar() {
   $('versao').textContent = `v${VERSAO}`;
   if (parametros.get('debug') === '1') iniciarDiagnostico(VERSAO);
+
+  // Antes de recarregar para uma versão nova, grava a tinta (trocado abaixo).
+  let salvarAntesDeSair = async () => {};
+  registrarServiceWorker(() => salvarAntesDeSair());
 
   // ?data=AAAA-MM-DD abre um dia específico (útil para testar).
   const pedida = parametros.get('data');
@@ -206,7 +274,9 @@ async function iniciar() {
     });
     tinta.importar(salvos);
     salvar = criarSalvador(data, tinta);
+    salvarAntesDeSair = () => salvar();
     configurarFerramentas(tinta);
+    precarregarProximos(hojeEmBrasilia(), datas);
 
     // Ao sair do app (trocar de app, apagar a tela), garante a última gravação.
     document.addEventListener('visibilitychange', () => {
