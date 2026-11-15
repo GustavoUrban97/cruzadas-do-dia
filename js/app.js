@@ -1,7 +1,8 @@
 // Inicialização e escolha do puzzle por data.
 
-import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre } from './datas.js';
-import { renderizarGrade, ajustarTamanho } from './grade.js';
+// ?v=N: mesmo número usado em index.html (veja o comentário lá).
+import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre } from './datas.js?v=2';
+import { renderizarGrade, ajustarTamanho } from './grade.js?v=2';
 
 const $ = id => document.getElementById(id);
 
