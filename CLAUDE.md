@@ -61,7 +61,8 @@ Usar **Pointer Events** (`pointerType`):
 | `mouse` | Desenha (só para desenvolver no PC) |
 
 - O botão lateral da S Pen pode chegar com valores diferentes de `buttons`/`button` dependendo do Chrome. Na Etapa 2, criar uma tela de diagnóstico (`?debug=1`) que mostra os eventos recebidos, para eu testar no tablet e ajustarmos.
-- Baixa latência: canvas com `getContext('2d', { desynchronized: true })`, `touch-action: none` na área de desenho, `getCoalescedEvents()` para traço suave e, se ajudar, `pointerrawupdate`. Redesenhar só o segmento novo durante o traço (não a tela toda a cada evento), e usar `requestAnimationFrame`.
+- Baixa latência: `touch-action: none` na área de desenho, `getCoalescedEvents()` para traço suave, `getPredictedEvents()` para encurtar o atraso percebido e, se ajudar, `pointerrawupdate`. Redesenhar só o segmento novo durante o traço (não a tela toda a cada evento), e usar `requestAnimationFrame`.
+- **Não usar `desynchronized: true`** nas camadas de tinta: no Tab S9 a parte transparente do canvas fica preta e cobre a grade. Fica atrás de `?baixalatencia=1` só para experimentos.
 - Canvas dimensionado com `devicePixelRatio` para não ficar borrado.
 - Pressão (`pressure`) influencia levemente a espessura.
 - Ferramentas na barra: **Caneta** (preta, padrão), **Lápis** (cinza, mais fino, para palpites), **Borracha**, **Desfazer**, **Refazer**.

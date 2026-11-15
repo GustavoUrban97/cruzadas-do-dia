@@ -1,7 +1,7 @@
 // Camada de tinta sobre a grade: captura da S Pen, desenho, borracha,
 // desfazer/refazer. O app não reconhece a escrita; só guarda os traços.
 //
-// Três canvas empilhados:
+// Três canvas transparentes empilhados sobre a grade:
 //   base     — traços terminados (redesenhado só quando algo é apagado/desfeito)
 //   traco    — o traço em andamento, desenhado aos pedacinhos (só o segmento novo)
 //   previsao — pontos previstos pelo Chrome e o círculo da borracha; limpo a cada quadro
@@ -19,11 +19,15 @@ const RAIO_BORRACHA = 0.014; // fração da largura da grade
 const BOTAO_BORRACHA = 32;  // ponta-borracha (buttons & 32)
 const BOTAO_LATERAL = 2;    // botão lateral da S Pen / botão direito do mouse (buttons & 2)
 
+// Modo de baixa latência (desynchronized): no Tab S9 ele deixa a parte transparente
+// do canvas PRETA, cobrindo a grade (o canvas vai direto para a tela sem se misturar
+// com o que está embaixo). Por isso fica desligado; dá para testar com ?baixalatencia=1.
+const BAIXA_LATENCIA = new URLSearchParams(location.search).get('baixalatencia') === '1';
+
 function criarCamada(classe, rapida) {
   const canvas = document.createElement('canvas');
   canvas.className = `tinta ${classe}`;
-  // desynchronized: a tinta vai para a tela sem esperar o compositor (menos atraso).
-  const ctx = canvas.getContext('2d', rapida ? { desynchronized: true } : {});
+  const ctx = canvas.getContext('2d', rapida && BAIXA_LATENCIA ? { desynchronized: true } : {});
   return { canvas, ctx };
 }
 
