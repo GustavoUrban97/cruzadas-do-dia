@@ -1,0 +1,41 @@
+name: Treinar modelo de letras
+
+# Treina o modelo que confere a escrita à caneta (tools/treino/treinar_letras.py).
+# Roda quando o script de treino muda, ou à mão (Actions → Treinar modelo de letras).
+# O resultado fica no artefato "modelo-letras" (pasta modelo/), que é baixado e
+# colocado no repositório num commit normal.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/treino/**'
+      - '.github/workflows/treinar-letras.yml'
+
+jobs:
+  treinar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Os dados do EMNIST (~560 MB) ficam em cache entre execuções.
+      - uses: actions/cache@v4
+        with:
+          path: dados
+          key: emnist-letters-v1
+
+      - name: Instalar PyTorch (CPU)
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+
+      - name: Treinar
+        run: python tools/treino/treinar_letras.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modelo-letras
+          path: modelo/
