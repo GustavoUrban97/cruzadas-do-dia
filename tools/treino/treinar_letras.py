@@ -158,7 +158,7 @@ def exportar(rede, teste, precisao, precisao_top3):
         for p in rede.parameters():
             p.copy_(p.half().float())
         exemplos = []
-        for i in range(0, 40 * 997, 997):
+        for i in range(0, len(teste), len(teste) // 40):
             x, y = teste[i]
             saida = rede(x[None])[0]
             exemplos.append({
