@@ -609,7 +609,9 @@ body {
 .area-teclado[hidden] { display: none; }
 
 .dica-atual {
-  margin: 0 0 6px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
   padding: 0.35rem 0.75rem;
   min-height: 2.1rem;
   border-radius: 8px;
@@ -663,4 +665,63 @@ body {
     width: 440px;
     margin-top: 0;
   }
+}
+
+/* Faixa da dica com ◀ ▶ (palavra anterior / seguinte) */
+.faixa-dica {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.dica-navegar {
+  flex: none;
+  width: 40px;
+  height: 2.1rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--casa-dica);
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.dica-navegar svg { width: 20px; height: 20px; }
+.dica-navegar:active { background: #c9c1ad; }
+
+/* Data: por extenso no tablet/PC, curta no celular */
+.data-curta { display: none; }
+
+/* ---------- Celular (tela estreita) ----------
+   Sem caneta: o modo teclado fica sempre ligado (js/app.js, mesmo limite de 599px),
+   então as ferramentas de caneta somem e a grade usa quase toda a largura. */
+@media (max-width: 599px) {
+  .barra { gap: 0.35rem; padding: 0.15rem 0.4rem; flex-wrap: wrap; }
+  .data { font-size: 0.95rem; }
+  .data-longa { display: none; }
+  .data-curta { display: inline; }
+  .info { display: none; }
+  .barra-dia .niveis { margin-left: auto; }
+  .nivel { height: 30px; padding: 0 0.55rem; font-size: 0.8rem; }
+  .barra-dia .botao-texto { height: 30px; padding: 0 0.5rem; }
+  .botao-icone { width: 34px; }
+
+  .ferramentas [data-ferramenta],
+  .ferramentas .cores,
+  .ferramentas .separador { display: none; }
+
+  .folha { padding: 0.35rem 6px; }
+  .banco { margin-top: 3px; font-size: 11px; }
+
+  .area-teclado { margin-top: 4px; max-width: none; }
+  .faixa-dica { margin-bottom: 4px; }
+  .dica-atual { font-size: 0.95rem; padding: 0.3rem 0.5rem; }
+  .teclado, .teclado-fileira { gap: 4px; }
+  .tecla { height: 42px; font-size: 1rem; }
+
+  .avaliacao { padding: 0.3rem 0.4rem; gap: 0.3rem; }
+  .avaliacao-rotulo { display: none; }
+  .sem-celular { display: none; }
+  .avaliacao .botao-texto { height: 30px; padding: 0 0.45rem; font-size: 0.75rem; }
 }

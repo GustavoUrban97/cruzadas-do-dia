@@ -68,12 +68,13 @@ export class Teclado {
    *   tinta          — a Tinta (guarda as letras)
    *   area           — bloco da faixa da dica + teclado (mostrado só no modo teclado)
    *   faixa          — onde vai a dica atual
+   *   anterior, seguinte — botões ◀ ▶ que andam de palavra em palavra
    *   teclas         — onde o teclado na tela é montado
    *   conferir       — true nos dias passados: marca letras certas e erradas
    *   aoResumo(certas, total)       — contagem das letras digitadas (para o gabarito)
    *   aoMudarVisibilidade()         — o teclado apareceu ou sumiu (a grade muda de tamanho)
    */
-  constructor({ grade, puzzle, tinta, area, faixa, teclas, conferir = false,
+  constructor({ grade, puzzle, tinta, area, faixa, anterior, seguinte, teclas, conferir = false,
     aoResumo = () => {}, aoMudarVisibilidade = () => {} }) {
     this.grade = grade;
     this.puzzle = puzzle;
@@ -86,7 +87,10 @@ export class Teclado {
     this.ativo = false;
     this.sel = null; // { l, c, sentido }
 
-    const { porCasa } = mapearPalavras(puzzle);
+    const { palavras, porCasa } = mapearPalavras(puzzle);
+    // Ordem do ◀ ▶: pela casa onde cada palavra começa (linha, depois coluna;
+    // a horizontal antes da vertical quando começam na mesma casa).
+    this.palavras = palavras;
     this.porCasa = porCasa;
     this.casas = new Map(); // "l,c" -> elemento da casa
     for (const casa of grade.querySelectorAll('.casa')) {
@@ -94,6 +98,9 @@ export class Teclado {
     }
 
     this.montarTeclas(teclas);
+    for (const [botao, passo] of [[anterior, -1], [seguinte, 1]]) {
+      botao?.addEventListener('pointerdown', e => { e.preventDefault(); this.navegar(passo); });
+    }
     document.addEventListener('keydown', e => this.aoTeclaFisica(e));
     this.pintarFaixa();
   }
@@ -207,6 +214,18 @@ export class Teclado {
       this.sel.sentido = outro;
       this.pintarSelecao();
     }
+  }
+
+  /** ◀ ▶: vai para a palavra anterior/seguinte, na primeira casa vazia dela. */
+  navegar(passo) {
+    const n = this.palavras.length;
+    if (!n) return;
+    const atual = this.palavras.indexOf(this.palavraAtual());
+    const i = atual === -1 ? (passo > 0 ? 0 : n - 1) : (atual + passo + n) % n;
+    const palavra = this.palavras[i];
+    const [l, c] = palavra.casas.find(([ll, cc]) => !this.tinta.letra(chaveDe(ll, cc))) || palavra.casas[0];
+    this.sel = { l, c, sentido: palavra.sentido };
+    this.pintarSelecao();
   }
 
   /** Setas: anda até a próxima casa de letra naquela direção. */

@@ -26,7 +26,7 @@ Publicado no **GitHub Pages** (repositório público) e usado como **página com
 - **HTML + CSS + JavaScript puro (ES modules), sem etapa de build.** O GitHub Pages serve os arquivos como estão. Sem frameworks e sem npm no app.
 - `sw.js` (service worker): guarda os arquivos da página para abrir sem internet e controla as versões (aviso "Atualização disponível"). Não há manifesto: a página não é instalável.
 - Persistência local: **IndexedDB** para a tinta (traços e letras digitadas) e o registro, com chave `[data, nivel]` (banco versão 3). `localStorage` só para preferências leves (ferramenta, cor, nível e gabarito visível). Sempre com try/catch.
-- Alvo: Chrome no Android 14+ (Tab S9). Não precisa suportar outros navegadores, mas não deve quebrar no Chrome desktop (útil para desenvolver com mouse).
+- Alvo: Chrome no Android 14+ (Tab S9; também celular, como o S24, só no modo teclado). Não precisa suportar outros navegadores, mas não deve quebrar no Chrome desktop (útil para desenvolver com mouse).
 
 ## Estrutura do repositório
 
@@ -82,13 +82,13 @@ Usar **Pointer Events** (`pointerType`):
 A caneta continua sendo a forma principal; o teclado é uma ferramenta a mais na barra, para PC ou tablet.
 
 - Com **Teclado** ativo, tocar numa casa (dedo, caneta ou mouse) **seleciona** em vez de desenhar; a ponta-borracha e o botão lateral continuam apagando. Tocar de novo na mesma casa troca horizontal/vertical; tocar numa casa de dica seleciona a palavra daquela dica (metade de cima ou de baixo).
-- A palavra selecionada fica destacada (amarelo claro) e a sua dica aparece numa **faixa** acima do teclado (seta + texto).
+- A palavra selecionada fica destacada (amarelo claro) e a sua dica aparece numa **faixa** acima do teclado (seta + texto), com **◀ ▶** para ir à palavra anterior/seguinte (ordem da casa onde cada palavra começa; para na primeira casa vazia).
 - **Teclado próprio** no estilo do Termo (A–Z, ⌫, ⇄ para trocar a direção), sem corretor e sem empurrar a página como o teclado do Android. No PC também vale o teclado físico (letras, Backspace, Delete, setas, espaço troca a direção); acento e cedilha viram a letra simples.
 - Letra digitada avança para a próxima casa vazia da palavra; ⌫ apaga a casa ou, se vazia, volta uma e apaga.
 - Retrato: o teclado fica embaixo da grade (a grade desconta a altura). Paisagem larga: fica ao lado (`--posicao: lado` no CSS faz `ajustarTamanho` descontar a largura).
 - As letras ficam por casa (`letras: {"linha,coluna": "A"}` no mesmo registro da tinta), em letra de forma, por baixo da tinta. Dá para misturar caneta e teclado no mesmo dia. A borracha passando no meio da casa apaga a letra; desfazer/refazer valem para traços e letras na mesma sequência.
 - Durante o dia nada é conferido. No **gabarito**, cada letra digitada certa ganha fundo verde claro e a errada fica riscada, com a certa pequena em verde no canto; aparece "Letras digitadas: X de Y certas". A avaliação do dia continua sendo minha.
-- Celular continua fora do escopo: o teclado e a faixa da dica são a base para um layout de celular no futuro.
+- **Celular** (tela com menos de 600 px, mesmo limite no CSS e em `js/app.js`): o modo teclado fica sempre ligado e as ferramentas de caneta (caneta, cores, lápis, borracha, botão Teclado) somem; a barra de escrita fica com Desfazer, Refazer e Terminei. Cabeçalho compacto: data curta ("sáb, 07/11"), sem número do puzzle/versão, barras podem quebrar linha em vez de cortar. Margem lateral de 6 px (o gesto de voltar só atrapalha a caneta). O texto das dicas dentro da grade fica minúsculo; a leitura é pela faixa (tocar na casa ou ◀ ▶). No gabarito, "Ocultar gabarito" vira "Ocultar". Deitado não tem layout especial.
 
 ## Layout
 
@@ -98,7 +98,7 @@ A caneta continua sendo a forma principal; o teclado é uma ferramenta a mais na
 - **Banco** (como no jornal): faixa fina embaixo da grade, à direita, com algumas palavras raras da própria grade escritas **de ponta-cabeça**, sempre visível. Fica fora da camada de tinta (não muda as coordenadas dos traços); a grade desconta a altura dela.
 - A camada de tinta cobre a grade inteira (casas de letra e de dica aceitam escrita).
 - Traços salvos em **coordenadas normalizadas** relativas à grade, para continuarem no lugar ao girar a tela ou redimensionar.
-- Cabeçalho em **duas barras**: em cima o dia (data por extenso, seletor **Fácil · Média · Difícil**, número do puzzle e versão discretos, Ontem/Hoje e o ícone do histórico); embaixo a escrita (caneta e cores, lápis, borracha, teclado, desfazer, refazer) e o **Terminei** à direita. Em retrato a grade é limitada pela largura, então a segunda barra não a diminui. Tudo precisa caber em ~600 px de largura (o ano da data some abaixo de 760 px).
+- Cabeçalho em **duas barras**: em cima o dia (data por extenso, seletor **Fácil · Média · Difícil**, número do puzzle e versão discretos, Ontem/Hoje e o ícone do histórico); embaixo a escrita (caneta e cores, lápis, borracha, teclado, desfazer, refazer) e o **Terminei** à direita. Em retrato a grade é limitada pela largura, então a segunda barra não a diminui. Tudo precisa caber em ~600 px de largura (o ano da data some abaixo de 760 px); abaixo de 600 px vale o layout de celular (ver Modo teclado).
 - Sem rolagem acidental nem zoom do navegador ao escrever (`user-scalable=no` no viewport é aceitável aqui).
 - Margem lateral de ~24px em volta da grade: no Tab S9 com navegação por gestos, escrever colado na borda dispara o "voltar" do Android. Além disso, depois de cada traço o app arma uma entrada extra no histórico, para o primeiro gesto de voltar acidental não sair da página (o Chrome só respeita `pushState` feito logo após uma ação do usuário, por isso é rearmado no fim do traço).
 
@@ -190,6 +190,7 @@ Fora do app (não entram no service worker):
 7. **Cabeçalho em duas barras e três níveis:** seletor Fácil/Média/Difícil, tinta e registro por nível (migração do que já existia para "Média"), histórico com abas por nível, backup formato 2, um puzzle de exemplo de cada nível. ✔
 8. **Conteúdo:** gerador em `tools/gerador.html` (o Python ficou só no validador) e um banco inicial de 30 dias × 3 níveis, em 3 lotes de 10 dias.
 9. **Modo teclado:** ferramenta Teclado, teclado próprio estilo Termo, faixa da dica atual, letras salvas com a tinta, conferência das letras digitadas no gabarito, backup formato 3. ✔
+10. **Celular:** layout para tela estreita (S24) só com o modo teclado, cabeçalho compacto, ◀ ▶ na faixa da dica. ✔
 
 ## Critérios de aceite
 
@@ -203,4 +204,4 @@ Fora do app (não entram no service worker):
 
 ## Fora do escopo (por enquanto)
 
-App instalável (PWA), botão Revelar, reconhecimento de escrita, celular (layout próprio), sincronização entre aparelhos, contas, compartilhamento de resultado.
+App instalável (PWA), botão Revelar, reconhecimento de escrita, zoom na grade, celular deitado, sincronização entre aparelhos, contas, compartilhamento de resultado.

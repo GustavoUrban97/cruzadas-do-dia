@@ -1,6 +1,6 @@
 // Inicialização e escolha do puzzle por data e nível.
 
-import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre, somarDias } from './datas.js';
+import { hojeEmBrasilia, dataValida, dataPorExtenso, dataAbreviada, dataCurta, diasEntre, somarDias } from './datas.js';
 import { renderizarGrade, renderizarBanco, ajustarTamanho, colocarGabarito } from './grade.js';
 import { Tinta } from './tinta.js';
 import { Teclado } from './teclado.js';
@@ -12,7 +12,11 @@ import { carregarTinta, salvarTinta, pedirPersistencia, carregarRegistro, atuali
 // Versão do app, mostrada discretamente no cabeçalho.
 // IMPORTANTE: precisa ser igual à VERSAO de sw.js, que deve subir a cada mudança
 // em HTML/CSS/JS (é o que faz o tablet perceber que há versão nova).
-const VERSAO = 13;
+const VERSAO = 14;
+
+// Celular (tela estreita): sem caneta, o jogo é só pelo modo teclado.
+// O mesmo limite está no CSS (@media max-width: 599px).
+const CELULAR = window.matchMedia('(max-width: 599px)');
 
 const $ = id => document.getElementById(id);
 const parametros = new URLSearchParams(location.search);
@@ -69,14 +73,18 @@ function gravarPreferencia(chave, valor) {
 
 function configurarFerramentas(tinta, teclado) {
   const botoes = [...document.querySelectorAll('[data-ferramenta]')];
-  const escolher = nome => {
+  const escolher = (nome, gravar = true) => {
     tinta.usar(nome);
     teclado.ativar(tinta.ferramenta === 'teclado');
     botoes.forEach(b => b.classList.toggle('ativa', b.dataset.ferramenta === tinta.ferramenta));
-    gravarPreferencia('ferramenta', tinta.ferramenta);
+    if (gravar) gravarPreferencia('ferramenta', tinta.ferramenta);
   };
   botoes.forEach(b => b.addEventListener('click', () => escolher(b.dataset.ferramenta)));
-  escolher(lerPreferencia('ferramenta', 'caneta'));
+  // No celular o teclado fica sempre ligado (as ferramentas de caneta nem aparecem);
+  // a preferência guardada vale de novo se a tela ficar larga (celular deitado, PC).
+  const aplicarTela = () => escolher(CELULAR.matches ? 'teclado' : lerPreferencia('ferramenta', 'caneta'), false);
+  aplicarTela();
+  CELULAR.addEventListener('change', aplicarTela);
 
   // Cores da caneta: escolher uma cor também ativa a caneta.
   const cores = [...document.querySelectorAll('[data-cor]')];
@@ -309,7 +317,11 @@ async function configurarDia({ data, nivel, arquivo, irPara }) {
     const mostrar = visivel => {
       grade.classList.toggle('com-gabarito', visivel);
       $('avaliacao').classList.toggle('com-gabarito', visivel); // resumo das letras digitadas
-      alternar.textContent = visivel ? 'Ocultar gabarito' : 'Mostrar gabarito';
+      // "Ocultar gabarito" — no celular só "Ocultar", para a faixa caber numa linha.
+      const resto = document.createElement('span');
+      resto.className = 'sem-celular';
+      resto.textContent = ' gabarito';
+      alternar.replaceChildren(visivel ? 'Ocultar' : 'Mostrar', resto);
       gravarPreferencia('gabarito', visivel ? 'mostrar' : 'ocultar');
     };
     mostrar(lerPreferencia('gabarito', 'mostrar') !== 'ocultar');
@@ -381,12 +393,19 @@ async function iniciar() {
   gravarPreferencia('nivel', nivel);
 
   // "domingo, 15 de novembro" + " de 2026" (o ano some em telas estreitas, para caber).
+  // No celular aparece só a forma curta: "dom, 15/11".
   const extenso = dataPorExtenso(data);
   const corte = extenso.lastIndexOf(' de ');
+  const longa = document.createElement('span');
+  longa.className = 'data-longa';
   const ano = document.createElement('span');
   ano.className = 'ano';
   ano.textContent = extenso.slice(corte);
-  $('data-extenso').replaceChildren(extenso.slice(0, corte), ano);
+  longa.append(extenso.slice(0, corte), ano);
+  const curta = document.createElement('span');
+  curta.className = 'data-curta';
+  curta.textContent = dataAbreviada(data);
+  $('data-extenso').replaceChildren(longa, curta);
   $('data-extenso').title = extenso;
 
   // Seletor de nível: marca o aberto; trocar grava a tinta e abre o mesmo dia no outro nível.
@@ -462,6 +481,8 @@ async function iniciar() {
       tinta,
       area: $('area-teclado'),
       faixa: $('dica-atual'),
+      anterior: $('dica-anterior'),
+      seguinte: $('dica-seguinte'),
       teclas: $('teclado'),
       conferir: data < hoje(),               // gabarito: marca letras digitadas certas e erradas
       aoResumo: (certas, total) => {

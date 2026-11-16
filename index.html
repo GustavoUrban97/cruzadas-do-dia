@@ -142,7 +142,15 @@
     <div class="banco" id="banco" hidden></div>
     <!-- Modo teclado: dica da palavra selecionada + teclado próprio (estilo Termo). -->
     <div class="area-teclado" id="area-teclado" hidden>
-      <p class="dica-atual" id="dica-atual"></p>
+      <div class="faixa-dica">
+        <button type="button" class="dica-navegar" id="dica-anterior" title="Palavra anterior" aria-label="Palavra anterior">
+          <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="#1a1a1a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <p class="dica-atual" id="dica-atual"></p>
+        <button type="button" class="dica-navegar" id="dica-seguinte" title="Próxima palavra" aria-label="Próxima palavra">
+          <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="#1a1a1a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
       <div class="teclado" id="teclado" role="group" aria-label="Teclado"></div>
     </div>
   </main>

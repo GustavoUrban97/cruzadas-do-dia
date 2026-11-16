@@ -50,3 +50,10 @@ export function dataCurta(iso) {
   const [, m, d] = iso.split('-');
   return `${d}/${m}`;
 }
+
+const formatoSemana = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', weekday: 'short' });
+
+/** "sáb, 07/11" (cabeçalho do celular) */
+export function dataAbreviada(iso) {
+  return `${formatoSemana.format(paraDataUTC(iso)).replace('.', '')}, ${dataCurta(iso)}`;
+}
