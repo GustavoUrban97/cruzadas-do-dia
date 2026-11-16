@@ -513,6 +513,7 @@ body {
 .seta-baixo { top: 1px; left: 50%; transform: translateX(-50%); }
 .seta-baixo-direita,
 .seta-direita-baixo { top: 1px; left: 1px; }
+.seta-direita-baixo.metade-baixo { top: 50%; }
 
 /* Gabarito (dias passados): letras verdes, levemente transparentes, por baixo da tinta.
    Verde para não confundir com nenhuma cor de caneta. */

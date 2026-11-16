@@ -81,8 +81,9 @@ export function renderizarGrade(elemento, puzzle) {
       const alvo = casas[l + dl]?.[c + dc];
       if (!alvo) return;
       const seta = criarSeta(dica.direcao);
-      // Duas dicas na mesma casa apontando para o lado: a seta acompanha a metade da dica.
-      if (dica.direcao === 'direita' && lista.length === 2) {
+      // Casa com duas dicas: a seta que sai pela lateral (→ ou ↴) acompanha a metade
+      // da sua dica, para duas setas na mesma casa de letra não ficarem uma por cima da outra.
+      if ((dica.direcao === 'direita' || dica.direcao === 'direita-baixo') && lista.length === 2) {
         seta.classList.add(i === 0 ? 'metade-cima' : 'metade-baixo');
       }
       alvo.append(seta);

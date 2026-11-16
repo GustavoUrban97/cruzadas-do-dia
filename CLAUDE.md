@@ -134,7 +134,8 @@ Como no jornal, sem ajuda durante o dia:
 - **Tamanho fixo: 13 colunas × 17 linhas**, todo dia e nos três níveis.
 - `nivel`: `facil`, `media` ou `dificil`; o arquivo se chama `AAAA-MM-DD-nivel.json`. O `id` é único entre todos os puzzles.
 - `#` = casa de dica. Casa `#` sem nenhuma dica aparece como casa preta. Letras maiúsculas sem acento (padrão de cruzadas brasileiras).
-- Cada dica fica na casa `(linha, coluna)`, que precisa ser `#`. No máximo **2 dicas por casa**; a primeira da lista ocupa a metade de cima.
+- Cada dica fica na casa `(linha, coluna)`, que precisa ser `#`. No máximo **2 dicas por casa**; a primeira da lista ocupa a metade de cima (de preferência a que aponta para a direita, → ou ↴; a que desce fica embaixo). Quando as duas saem pela lateral (→ e ↴), cada seta fica na altura da sua dica.
+- **Cada puzzle tem o seu próprio esqueleto** (posição das casas de dica), inclusive a primeira linha e a primeira coluna: nada de padrão fixo repetido entre níveis ou dias.
 - `direcao` (de onde começa a resposta, a partir da casa da dica):
   - `direita` (→): começa na casa à direita e corre para a direita.
   - `baixo` (↓): começa na casa de baixo e desce.
@@ -149,7 +150,7 @@ Como no jornal, sem ajuda durante o dia:
 Scripts Python, fora do app:
 
 1. `validar.py` — lê todos os JSON de `puzzles/` e falha se: grade diferente de 13×17; caractere inválido; dica fora de casa `#` ou apontando para casa que não é letra; mais de 2 dicas na mesma casa; palavra da grade (2+ letras) sem dica, ou com mais de uma; `resposta` não bate com a grade; palavra repetida no mesmo puzzle; `nivel` ausente ou inválido; nome do arquivo diferente de `data-nivel`; `id` repetido. Avisa (sem falhar) sobre dicas longas demais. Ao final, **regenera `puzzles/index.json`** no formato `{"datas": {"AAAA-MM-DD": ["facil", "media", "dificil"]}}`.
-2. `gerar_grade.py` — monta um padrão 13×17 de casas de dica e preenche com palavras comuns em português (lista de frequência, por exemplo o pacote `wordfreq`, removendo acentos), sem repetir palavras, atribui cada palavra a uma casa de dica vizinha (no máximo 2 por casa) e gera o JSON com os textos das dicas em branco para eu (ou uma IA) escrever.
+2. `gerar_grade.py` — sorteia um esqueleto 13×17 diferente a cada puzzle (bordas e miolo; toda palavra com seta para o seu início, toda casa de dica com ao menos uma dica) e preenche com palavras em português (lista de frequência, por exemplo o pacote `wordfreq`, removendo acentos, filtrada por dicionário e por uma lista de palavras proibidas: estrangeirismos, siglas, nomes próprios, palavrões; por nível: fácil só com palavras comuns e palavras de até 6 letras, difícil com menos casas de dica e palavras menos usuais, mas palavras de 2–3 letras sempre das mais comuns), sem repetir palavras, atribui cada palavra a uma casa de dica vizinha (no máximo 2 por casa) e gera o JSON com os textos das dicas em branco para eu (ou uma IA) escrever.
 3. Dicas escritas em lotes (um mês por vez) e revisadas por mim. Não copiar puzzles de revistas, jornais ou apps.
 
 ## GitHub Pages e CI
