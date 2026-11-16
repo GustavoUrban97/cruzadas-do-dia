@@ -63,6 +63,65 @@ class EspessuraAleatoria:
         return x
 
 
+O = CLASSES.index("O")
+
+
+def abrir_laco(x):
+    """Apaga uma fatia do contorno, vista do centro da tinta: o O que não fechou.
+
+    A abertura tem de 20° a 70°, quase sempre em cima (onde a caneta começa e
+    termina o O); às vezes em qualquer lugar. Aberturas maiores já são U ou C.
+    """
+    img = x[0]
+    peso = img.sum()
+    if peso < 1:
+        return x
+    altura, largura = img.shape
+    ys = torch.arange(altura, dtype=img.dtype)[:, None].expand(altura, largura)
+    xs = torch.arange(largura, dtype=img.dtype)[None, :].expand(altura, largura)
+    cy = (img * ys).sum() / peso
+    cx = (img * xs).sum() / peso
+    angulo = torch.rad2deg(torch.atan2(ys - cy, xs - cx))   # -90° = em cima (y cresce para baixo)
+    if random.random() < 0.8:
+        centro = -90 + random.gauss(0, 35)
+    else:
+        centro = random.uniform(-180, 180)
+    meia = random.uniform(20, 70) / 2
+    diferenca = (angulo - centro + 180) % 360 - 180
+    fatia = diferenca.abs() <= meia
+    return (img * ~fatia)[None]
+
+
+def falhar_traco(x):
+    """Uma falhinha no traço (a caneta levantou um instante): zera um ponto de tinta."""
+    img = x[0]
+    tinta = (img > 0.5).nonzero()
+    if not len(tinta):
+        return x
+    y, xx = tinta[random.randrange(len(tinta))].tolist()
+    img = img.clone()
+    img[max(0, y - 1):y + 1, max(0, xx - 1):xx + 1] = 0
+    return img[None]
+
+
+class ComAberturas(torch.utils.data.Dataset):
+    """Aumentos que dependem da letra: metade dos O ganham uma abertura; em
+    qualquer letra, às vezes, uma falhinha no traço."""
+    def __init__(self, base):
+        self.base = base
+
+    def __len__(self):
+        return len(self.base)
+
+    def __getitem__(self, i):
+        x, y = self.base[i]
+        if y == O and random.random() < 0.5:
+            x = abrir_laco(x)
+        if random.random() < 0.2:
+            x = falhar_traco(x)
+        return x, y
+
+
 class Rede(nn.Module):
     # conv 3×3 (mesmo tamanho) + ReLU + max-pool 2×2, três vezes; depois duas densas.
     def __init__(self):
@@ -96,19 +155,27 @@ def carregar():
                              transform=treino_tf, target_transform=alvo)
     teste = datasets.EMNIST(DADOS, split="letters", train=False, download=True,
                             transform=teste_tf, target_transform=alvo)
-    return treino, teste
+    return ComAberturas(treino), teste
 
 
-def avaliar(rede, carregador):
+def avaliar(rede, carregador, por_letra=False):
     rede.eval()
     certas = total = 0
     certas_top3 = 0
+    acertos = torch.zeros(ROTULOS)
+    quantos = torch.zeros(ROTULOS)
     with torch.no_grad():
         for x, y in carregador:
             saida = rede(x)
-            certas += (saida.argmax(1) == y).sum().item()
+            acertou = saida.argmax(1) == y
+            certas += acertou.sum().item()
             certas_top3 += (saida.topk(3, 1).indices == y[:, None]).any(1).sum().item()
             total += len(y)
+            acertos.index_add_(0, y, acertou.float())
+            quantos.index_add_(0, y, torch.ones(len(y)))
+    if por_letra:
+        print("por letra: " + " ".join(f"{CLASSES[i]} {acertos[i] / quantos[i]:.3f}"
+                                       for i in range(ROTULOS)), flush=True)
     return certas / total, certas_top3 / total
 
 
@@ -188,7 +255,7 @@ def main():
             perda.backward()
             otimizador.step()
             agenda.step()
-        precisao, top3 = avaliar(rede, carregador_teste)
+        precisao, top3 = avaliar(rede, carregador_teste, por_letra=epoca == EPOCAS)
         print(f"época {epoca}: teste {precisao:.4f} (top-3 {top3:.4f}) · {time.time() - inicio:.0f} s", flush=True)
 
     exportar(rede, teste, precisao, top3)
