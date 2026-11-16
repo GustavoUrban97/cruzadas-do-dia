@@ -557,3 +557,110 @@ body {
   padding: 2rem;
   font-style: italic;
 }
+
+/* ---------- Modo teclado ---------- */
+
+/* Letras digitadas: letra de forma, por baixo da tinta (o canvas fica por cima). */
+.letra-digitada {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: system-ui, "Roboto", "Segoe UI", sans-serif;
+  font-weight: 600;
+  font-size: calc(min(var(--casa-l), var(--casa-a)) * 0.56);
+  line-height: 1;
+  color: var(--tinta);
+  pointer-events: none;
+}
+
+/* Palavra e casa selecionadas (só no modo teclado). */
+.casa.sel-palavra { background: #f4e7b8; }
+.casa.sel-casa    { background: #e9cf6e; }
+
+/* Gabarito: letra digitada certa ganha fundo verde claro; errada fica riscada,
+   com a certa pequena em verde no canto (no lugar da letra verde grande). */
+.grade.com-gabarito .casa.digitada .letra-gabarito { display: none; }
+.grade.com-gabarito .casa.certa { background: #d7ecd9; }
+.grade.com-gabarito .casa.errada .letra-digitada {
+  text-decoration: line-through;
+  text-decoration-color: var(--gabarito);
+  text-decoration-thickness: 2px;
+}
+.grade.com-gabarito .casa.errada .letra-gabarito {
+  display: block;
+  inset: auto 2px 1px auto;
+  font-size: calc(min(var(--casa-l), var(--casa-a)) * 0.3);
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.resumo-letras { font-size: 0.8rem; color: var(--gabarito); font-weight: 700; }
+.resumo-letras[hidden],
+.avaliacao:not(.com-gabarito) .resumo-letras { display: none; }
+
+/* Faixa da dica atual + teclado, embaixo da grade */
+.area-teclado {
+  flex: none;
+  width: 100%;
+  max-width: 620px;
+  margin-top: 6px;
+}
+.area-teclado[hidden] { display: none; }
+
+.dica-atual {
+  margin: 0 0 6px;
+  padding: 0.35rem 0.75rem;
+  min-height: 2.1rem;
+  border-radius: 8px;
+  background: var(--casa-dica);
+  font-size: 1.05rem;
+  line-height: 1.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dica-atual.vazia { color: var(--tinta-suave); font-style: italic; }
+.dica-atual-seta { margin-right: 0.5rem; font-weight: 700; }
+
+/* Teclado no estilo do Termo, em tons de papel */
+.teclado { display: grid; gap: 5px; }
+.teclado-fileira { display: flex; justify-content: center; gap: 5px; }
+.tecla {
+  flex: 1 1 0;
+  max-width: 54px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: #ddd7c8;
+  color: var(--tinta);
+  font: 700 1.1rem system-ui, "Roboto", "Segoe UI", sans-serif;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.tecla:active { background: #c9c1ad; }
+.tecla-larga { flex-grow: 1.5; max-width: 80px; font-size: 1.25rem; }
+
+/* Paisagem: sobra largura e falta altura, então o teclado vai para o lado da grade.
+   --posicao avisa o ajustarTamanho (js/grade.js) para descontar a largura, não a altura. */
+@media (orientation: landscape) and (min-width: 900px) {
+  body.modo-teclado .folha {
+    display: grid;
+    grid-template-columns: auto minmax(300px, 440px);
+    grid-template-rows: auto auto;
+    align-content: center;
+    justify-content: center;
+    column-gap: 32px;
+  }
+  body.modo-teclado .papel { grid-column: 1; grid-row: 1; }
+  body.modo-teclado .banco { grid-column: 1; grid-row: 2; justify-self: start; }
+  body.modo-teclado .area-teclado {
+    --posicao: lado;
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    width: 440px;
+    margin-top: 0;
+  }
+}

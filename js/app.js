@@ -3,6 +3,7 @@
 import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre, somarDias } from './datas.js';
 import { renderizarGrade, renderizarBanco, ajustarTamanho, colocarGabarito } from './grade.js';
 import { Tinta } from './tinta.js';
+import { Teclado } from './teclado.js';
 import { iniciarDiagnostico } from './diagnostico.js';
 import { iniciarHistorico } from './historico.js';
 import { NIVEIS, NOMES_NIVEIS, nivelValido } from './niveis.js';
@@ -11,7 +12,7 @@ import { carregarTinta, salvarTinta, pedirPersistencia, carregarRegistro, atuali
 // Versão do app, mostrada discretamente no cabeçalho.
 // IMPORTANTE: precisa ser igual à VERSAO de sw.js, que deve subir a cada mudança
 // em HTML/CSS/JS (é o que faz o tablet perceber que há versão nova).
-const VERSAO = 12;
+const VERSAO = 13;
 
 const $ = id => document.getElementById(id);
 const parametros = new URLSearchParams(location.search);
@@ -66,10 +67,11 @@ function gravarPreferencia(chave, valor) {
 
 // ---------- Barra de ferramentas ----------
 
-function configurarFerramentas(tinta) {
+function configurarFerramentas(tinta, teclado) {
   const botoes = [...document.querySelectorAll('[data-ferramenta]')];
   const escolher = nome => {
     tinta.usar(nome);
+    teclado.ativar(tinta.ferramenta === 'teclado');
     botoes.forEach(b => b.classList.toggle('ativa', b.dataset.ferramenta === tinta.ferramenta));
     gravarPreferencia('ferramenta', tinta.ferramenta);
   };
@@ -120,7 +122,7 @@ function mostrarToast(texto) {
 
 // ---------- Salvar a tinta (IndexedDB) ----------
 
-/** Salva os traços do puzzle; várias mudanças seguidas viram uma gravação só. */
+/** Salva os traços e as letras do puzzle; várias mudanças seguidas viram uma gravação só. */
 function criarSalvador(data, nivel, tinta) {
   let fila = Promise.resolve();
   let agendado = false;
@@ -129,7 +131,7 @@ function criarSalvador(data, nivel, tinta) {
     if (agendado) return fila;
     agendado = true;
     fila = fila
-      .then(() => { agendado = false; return salvarTinta(data, nivel, tinta.exportar()); })
+      .then(() => { agendado = false; return salvarTinta(data, nivel, tinta.exportar(), tinta.exportarLetras()); })
       .catch(erro => {
         agendado = false;
         console.error(erro);
@@ -306,6 +308,7 @@ async function configurarDia({ data, nivel, arquivo, irPara }) {
     const alternar = $('alternar-gabarito');
     const mostrar = visivel => {
       grade.classList.toggle('com-gabarito', visivel);
+      $('avaliacao').classList.toggle('com-gabarito', visivel); // resumo das letras digitadas
       alternar.textContent = visivel ? 'Ocultar gabarito' : 'Mostrar gabarito';
       gravarPreferencia('gabarito', visivel ? 'mostrar' : 'ocultar');
     };
@@ -337,9 +340,10 @@ async function lembrarOntem(ontem, nivelAberto, irPara) {
   const ordem = [nivelAberto, ...NIVEIS.filter(n => n !== nivelAberto)];
   for (const nivel of ordem) {
     try {
-      const [registro, tracos] = await Promise.all([carregarRegistro(ontem, nivel), carregarTinta(ontem, nivel)]);
+      const [registro, folha] = await Promise.all([carregarRegistro(ontem, nivel), carregarTinta(ontem, nivel)]);
       if (registro && registro.avaliacao) continue;
-      if (!(registro && registro.terminei) && tracos.length === 0) continue;
+      const escreveu = folha.tracos.length > 0 || Object.keys(folha.letras).length > 0;
+      if (!(registro && registro.terminei) && !escreveu) continue;
       const faixa = $('lembrete-ontem');
       faixa.textContent = `Gabarito de ontem (${NOMES_NIVEIS[nivel]}) disponível · toque para avaliar`;
       faixa.hidden = false;
@@ -413,13 +417,13 @@ async function iniciar() {
     renderizarGrade($('grade'), puzzle);
     renderizarBanco($('banco'), puzzle);
     if (data < hoje()) colocarGabarito($('grade'), puzzle); // como no jornal: só no dia seguinte
-    const ajustar = () => ajustarTamanho($('grade'), $('folha'), puzzle, $('banco'));
+    const ajustar = () => ajustarTamanho($('grade'), $('folha'), puzzle, $('banco'), [$('area-teclado')]);
     ajustar();
     // Girar a tela ou redimensionar a janela: recalcula o tamanho das casas.
     new ResizeObserver(() => requestAnimationFrame(ajustar)).observe($('folha'));
 
     // Tinta salva deste puzzle (antes de liberar a caneta, para nada ser sobrescrito).
-    let salvos = [];
+    let salvos = { tracos: [], letras: {} };
     let leuTinta = true;
     try {
       salvos = await carregarTinta(data, nivel);
@@ -434,8 +438,13 @@ async function iniciar() {
     const armarVoltar = criarProtecaoVoltar();
     let persistenciaPedida = false;
     let salvar = () => {};
+    let teclado = null;
 
     const tinta = new Tinta($('papel'), {
+      colunas: puzzle.largura,
+      linhas: puzzle.altura,
+      aoTocarCasa: (x, y) => teclado && teclado.tocar(x, y),       // modo teclado
+      aoMudarLetras: chaves => teclado && teclado.atualizarLetras(chaves),
       aoMudarHistorico: (podeDesfazer, podeRefazer) => {
         $('desfazer').disabled = !podeDesfazer;
         $('refazer').disabled = !podeRefazer;
@@ -446,11 +455,27 @@ async function iniciar() {
         if (!persistenciaPedida) { persistenciaPedida = true; pedirPersistencia(); }
       },
     });
-    tinta.importar(salvos);
+    // Modo teclado: seleção de casa, teclado na tela, faixa da dica atual.
+    teclado = new Teclado({
+      grade: $('grade'),
+      puzzle,
+      tinta,
+      area: $('area-teclado'),
+      faixa: $('dica-atual'),
+      teclas: $('teclado'),
+      conferir: data < hoje(),               // gabarito: marca letras digitadas certas e erradas
+      aoResumo: (certas, total) => {
+        const resumo = $('resumo-letras');
+        resumo.hidden = total === 0;
+        resumo.textContent = `Letras digitadas: ${certas} de ${total} certas`;
+      },
+      aoMudarVisibilidade: ajustar,
+    });
+    tinta.importar(salvos.tracos, salvos.letras);
     // Se não deu para ler a tinta guardada, não grava por cima dela (perderia o que já estava lá).
     salvar = leuTinta ? criarSalvador(data, nivel, tinta) : async () => {};
     salvarAntesDeSair = () => salvar();
-    configurarFerramentas(tinta);
+    configurarFerramentas(tinta, teclado);
     precarregarProximos(hojeEmBrasilia(), indice);
 
     // Trocar de dia ou de nível (Ontem / Hoje / lembrete / seletor): grava a tinta antes de sair.

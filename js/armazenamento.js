@@ -1,5 +1,5 @@
 // Persistência local no IndexedDB, uma entrada por puzzle (data + nível):
-//  - tinta:    os traços;
+//  - tinta:    os traços e as letras digitadas (modo teclado);
 //  - registro: o que aconteceu (terminei, avaliação do gabarito).
 // Chave das duas lojas: [data, nivel], ex.: ['2026-11-20', 'facil'].
 // Se o armazenamento falhar, o app continua funcionando (só não guarda),
@@ -9,7 +9,7 @@ const BANCO = 'cruzadas-do-dia';
 const VERSAO_BANCO = 3;          // 1: tinta · 2: + registro · 3: chave com nível
 const CHAVE = ['data', 'nivel'];
 const NIVEL_ANTIGO = 'media';     // o que foi salvo antes dos três níveis vira "Média"
-const LOJA_TINTA = 'tinta';       // { data, nivel, tracos: [...], atualizado }
+const LOJA_TINTA = 'tinta';       // { data, nivel, tracos: [...], letras: {"l,c": "A"}, atualizado }
 const LOJA_REGISTRO = 'registro'; // { data, nivel, puzzle, terminei, termineiEm, avaliacao, avaliadoEm }
 
 let bancoAberto = null;
@@ -73,18 +73,24 @@ function transacao(nomeLoja, modo, operacao) {
   }));
 }
 
-// ---------- Tinta ----------
+// ---------- Tinta (traços e letras digitadas) ----------
 
-/** Traços salvos para o puzzle (data + nível), ou [] se ainda não houver nada. */
+/**
+ * Folha salva do puzzle (data + nível): { tracos: [...], letras: {"linha,coluna": "A"} }.
+ * Sem nada salvo ainda: listas vazias.
+ */
 export async function carregarTinta(data, nivel) {
   const salvo = await transacao(LOJA_TINTA, 'readonly', loja => loja.get([data, nivel]));
-  return salvo ? salvo.tracos : [];
+  return {
+    tracos: (salvo && Array.isArray(salvo.tracos)) ? salvo.tracos : [],
+    letras: (salvo && salvo.letras && typeof salvo.letras === 'object') ? salvo.letras : {},
+  };
 }
 
-/** Grava (substitui) os traços do puzzle. */
-export function salvarTinta(data, nivel, tracos) {
+/** Grava (substitui) os traços e as letras digitadas do puzzle. */
+export function salvarTinta(data, nivel, tracos, letras = {}) {
   return transacao(LOJA_TINTA, 'readwrite', loja =>
-    loja.put({ data, nivel, tracos, atualizado: new Date().toISOString() }));
+    loja.put({ data, nivel, tracos, letras, atualizado: new Date().toISOString() }));
 }
 
 // ---------- Registro ----------

@@ -111,16 +111,24 @@ export function renderizarBanco(elemento, puzzle) {
  * Dimensiona a grade para ocupar o espaço disponível. As casas podem ficar
  * um pouco mais altas que largas (como na revista), até o limite de 1,3.
  * `banco` (opcional) fica embaixo da grade: desconta a altura dele e
- * acompanha a largura da grade.
+ * acompanha a largura da grade. `abaixo` são outros blocos embaixo da grade
+ * (o teclado), que também descontam a altura quando visíveis. Um bloco com
+ * a variável CSS `--posicao: lado` fica ao lado da grade (paisagem) e
+ * desconta a largura, mais o espaço entre as colunas.
  */
-export function ajustarTamanho(elemento, area, puzzle, banco = null) {
+export function ajustarTamanho(elemento, area, puzzle, banco = null, abaixo = []) {
   const { width, height } = area.getBoundingClientRect();
   const estilo = getComputedStyle(area);
-  const w = width - parseFloat(estilo.paddingLeft) - parseFloat(estilo.paddingRight);
+  let w = width - parseFloat(estilo.paddingLeft) - parseFloat(estilo.paddingRight);
   let h = height - parseFloat(estilo.paddingTop) - parseFloat(estilo.paddingBottom);
-  if (banco && !banco.hidden) {
-    const margem = parseFloat(getComputedStyle(banco).marginTop) || 0;
-    h -= banco.offsetHeight + margem;
+  for (const bloco of [banco, ...abaixo]) {
+    if (!bloco || bloco.hidden) continue;
+    const estiloBloco = getComputedStyle(bloco);
+    if (estiloBloco.getPropertyValue('--posicao').trim() === 'lado') {
+      w -= bloco.offsetWidth + (parseFloat(estilo.columnGap) || 0);
+    } else {
+      h -= bloco.offsetHeight + (parseFloat(estiloBloco.marginTop) || 0);
+    }
   }
   const proporcaoMax = 1.3; // altura / largura de cada casa
 

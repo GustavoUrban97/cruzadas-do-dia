@@ -22,14 +22,15 @@ const ROTULOS = {
 
 /**
  * Estado de cada dia jogado num nível: avaliação, se houver; senão "terminei"
- * (marcou Terminei e não avaliou) ou "jogou" (só tem tinta). Dia sem nada = não jogou.
+ * (marcou Terminei e não avaliou) ou "jogou" (só tem tinta ou letras digitadas). Dia sem nada = não jogou.
  * Cada nível tem as suas estatísticas, como no Termo.
  */
 export function estadosDosDias({ tinta, registro }, nivel) {
   const estados = new Map();
   for (const t of tinta) {
     if (!t || t.nivel !== nivel || !dataValida(t.data)) continue;
-    if (Array.isArray(t.tracos) && t.tracos.length) estados.set(t.data, 'jogou');
+    const letras = t.letras && typeof t.letras === 'object' ? Object.keys(t.letras).length : 0;
+    if ((Array.isArray(t.tracos) && t.tracos.length) || letras) estados.set(t.data, 'jogou');
   }
   for (const r of registro) {
     if (!r || r.nivel !== nivel || !dataValida(r.data)) continue;
@@ -245,7 +246,7 @@ async function exportar(hoje) {
   const { tinta, registro } = await lerTudo();
   const conteudo = JSON.stringify({
     app: 'cruzadas-do-dia',
-    formato: 2,            // 2: cada entrada tem "nivel"
+    formato: 3,            // 2: cada entrada tem "nivel" · 3: + letras digitadas (modo teclado)
     exportadoEm: new Date().toISOString(),
     tinta,
     registro,
@@ -267,7 +268,7 @@ export function lerBackup(texto) {
   if (!dados || dados.app !== 'cruzadas-do-dia' || !Array.isArray(dados.tinta) || !Array.isArray(dados.registro)) {
     throw new Error('não parece um backup do Cruzadas do Dia');
   }
-  if (dados.formato !== 1 && dados.formato !== 2) throw new Error(`formato de backup desconhecido (${dados.formato})`);
+  if (![1, 2, 3].includes(dados.formato)) throw new Error(`formato de backup desconhecido (${dados.formato})`);
   // Formato 1 (antes dos três níveis): tudo era o puzzle que hoje é a "Média".
   const comNivel = item => (dados.formato === 1 ? { ...item, nivel: 'media' } : item);
   const valido = item => item && typeof item === 'object' && dataValida(item.data) && nivelValido(item.nivel);

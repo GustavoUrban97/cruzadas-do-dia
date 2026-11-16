@@ -165,12 +165,22 @@ export class Tinta {
    *   aoMudar()              — fim de cada traço/apagada/desfazer/refazer (para salvar)
    *   aoMudarHistorico(podeDesfazer, podeRefazer)
    *   aoTerminarGesto()      — caneta levantada (momento com "ativação do usuário")
+   *   aoTocarCasa(x, y)      — modo teclado: toque (dedo, caneta ou mouse) em x, y normalizados
+   *   aoMudarLetras(chaves)  — as letras digitadas dessas casas ("linha,coluna") mudaram
+   *   colunas, linhas        — tamanho da grade (para a borracha achar a casa de cada letra)
    */
-  constructor(papel, { aoMudar = () => {}, aoMudarHistorico = () => {}, aoTerminarGesto = () => {} } = {}) {
+  constructor(papel, {
+    aoMudar = () => {}, aoMudarHistorico = () => {}, aoTerminarGesto = () => {},
+    aoTocarCasa = () => {}, aoMudarLetras = () => {}, colunas = 13, linhas = 17,
+  } = {}) {
     this.papel = papel;
     this.aoMudar = aoMudar;
     this.aoMudarHistorico = aoMudarHistorico;
     this.aoTerminarGesto = aoTerminarGesto;
+    this.aoTocarCasa = aoTocarCasa;
+    this.aoMudarLetras = aoMudarLetras;
+    this.colunas = colunas;
+    this.linhas = linhas;
 
     this.base = criarCamada('tinta-base', false);
     this.traco = criarCamada('tinta-traco', true);
@@ -178,8 +188,12 @@ export class Tinta {
     papel.append(this.base.canvas, this.traco.canvas, this.extra.canvas);
 
     this.tracos = [];        // { ferramenta, cor?, pontos: [[x, y, pressao]], caixa, apagado }
-    this.historico = [];     // { tracos: [...], apagar: bool }
+    this.letras = new Map(); // letras digitadas (modo teclado): "linha,coluna" -> "A"
+    // Cada ação: { tracos: [...], apagar: bool, letras: [{ chave, antes, depois }] }.
+    // Traços e letras ficam na mesma sequência de desfazer/refazer.
+    this.historico = [];
     this.refazerPilha = [];
+    this.toque = null;       // modo teclado: toque em andamento (vira seleção ao soltar)
     this.ferramenta = 'caneta';
     this.cor = 'preta';      // cor da caneta (chave de CORES_CANETA)
     this.gesto = null;       // gesto em andamento (um ponteiro por vez)
@@ -238,6 +252,13 @@ export class Tinta {
   }
 
   aoPressionar(e) {
+    // Modo teclado: tocar (com qualquer coisa) seleciona a casa, sem desenhar.
+    // A ponta-borracha e o botão lateral continuam apagando.
+    if (this.ferramenta === 'teclado' && !this.gesto && !this.ehBorracha(e)) {
+      e.preventDefault();
+      this.toque = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, longe: false }; // vale o último toque
+      return;
+    }
     if (e.pointerType === 'touch') return;      // dedo/palma nunca desenha
     if (this.gesto) return;                      // já tem um traço em andamento
     if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
@@ -251,6 +272,9 @@ export class Tinta {
   }
 
   aoMover(e) {
+    const toque = this.toque;
+    if (toque && e.pointerId === toque.pointerId
+        && Math.hypot(e.clientX - toque.x, e.clientY - toque.y) > 12) toque.longe = true; // arrastou: não é toque
     const g = this.gesto;
     if (!g || e.pointerId !== g.pointerId) return;
     // Apertou/soltou o botão lateral no meio do gesto: troca de modo.
@@ -267,6 +291,15 @@ export class Tinta {
   }
 
   aoSoltar(e) {
+    const toque = this.toque;
+    if (toque && e.pointerId === toque.pointerId) {
+      this.toque = null;
+      if (e.type === 'pointerup' && !toque.longe) {
+        const ret = this.papel.getBoundingClientRect();
+        this.aoTocarCasa((e.clientX - ret.left) / ret.width, (e.clientY - ret.top) / ret.height);
+      }
+      return;
+    }
     const g = this.gesto;
     if (!g || e.pointerId !== g.pointerId) return;
     this.processarPendentes();
@@ -288,6 +321,7 @@ export class Tinta {
       g.pincel = new Pincel(this.traco.ctx, estiloDo(g.traco), this.w);
     } else {
       g.apagados = new Set();
+      g.letrasApagadas = [];
       g.ultimo = null;
     }
   }
@@ -301,10 +335,10 @@ export class Tinta {
         t.caixa = caixaDe(t.pontos);
         this.tracos.push(t);
         this.tracarCompleto(this.base.ctx, t);
-        this.registrar({ tracos: [t], apagar: false });
+        this.registrar({ tracos: [t], apagar: false, letras: [] });
       }
-    } else if (g.apagados.size) {
-      this.registrar({ tracos: [...g.apagados], apagar: true });
+    } else if (g.apagados.size || g.letrasApagadas.length) {
+      this.registrar({ tracos: [...g.apagados], apagar: true, letras: g.letrasApagadas });
     }
   }
 
@@ -346,6 +380,7 @@ export class Tinta {
       let mudou = false;
       for (const pt of pontos) {
         if (this.apagarEm(g.ultimo || pt, pt, g.apagados)) mudou = true;
+        this.apagarLetraEm(pt, g.letrasApagadas);
         g.ultimo = pt;
       }
       if (mudou) this.redesenharBase();
@@ -407,6 +442,20 @@ export class Tinta {
     return mudou;
   }
 
+  /** A borracha passando perto do meio de uma casa apaga a letra digitada dela. */
+  apagarLetraEm(pt, apagadas) {
+    if (!this.letras.size) return;
+    const cx = pt.x / this.w * this.colunas, cy = pt.y / this.h * this.linhas;
+    const c = Math.floor(cx), l = Math.floor(cy);
+    if (Math.abs(cx - c - 0.5) > 0.32 || Math.abs(cy - l - 0.5) > 0.32) return; // longe da letra
+    const chave = `${l},${c}`;
+    const antes = this.letras.get(chave);
+    if (!antes) return;
+    this.letras.delete(chave);
+    apagadas.push({ chave, antes, depois: null });
+    this.aoMudarLetras([chave]);
+  }
+
   tocaTraco(t, x, y, r) {
     const pts = t.pontos;
     if (pts.length === 1) return Math.hypot(pts[0][0] * this.w - x, pts[0][1] * this.h - y) <= r;
@@ -421,7 +470,34 @@ export class Tinta {
   // ---------- Ferramentas, desfazer, refazer ----------
 
   usar(ferramenta) {
-    if (ferramenta in FERRAMENTAS || ferramenta === 'borracha') this.ferramenta = ferramenta;
+    if (ferramenta in FERRAMENTAS || ferramenta === 'borracha' || ferramenta === 'teclado') this.ferramenta = ferramenta;
+    this.toque = null;
+  }
+
+  // ---------- Letras digitadas (modo teclado) ----------
+
+  letra(chave) { return this.letras.get(chave) || ''; }
+
+  /** Põe (ou apaga, com letra vazia) a letra de uma casa; entra no desfazer. */
+  definirLetra(chave, letra) {
+    const antes = this.letras.get(chave) || null;
+    const depois = letra || null;
+    if (antes === depois) return;
+    this.aplicarLetra(chave, depois);
+    this.aoMudarLetras([chave]);
+    this.registrar({ tracos: [], apagar: false, letras: [{ chave, antes, depois }] });
+  }
+
+  aplicarLetra(chave, letra) {
+    if (letra) this.letras.set(chave, letra); else this.letras.delete(chave);
+  }
+
+  /** Volta (ou refaz) as letras de uma ação e avisa quem mostra as letras. */
+  aplicarLetras(acao, desfazendo) {
+    if (!acao.letras || !acao.letras.length) return;
+    const lista = desfazendo ? [...acao.letras].reverse() : acao.letras;
+    for (const m of lista) this.aplicarLetra(m.chave, desfazendo ? m.antes : m.depois);
+    this.aoMudarLetras(acao.letras.map(m => m.chave));
   }
 
   usarCor(cor) {
@@ -433,6 +509,7 @@ export class Tinta {
     const acao = this.historico.pop();
     if (!acao) return;
     for (const t of acao.tracos) t.apagado = !acao.apagar;
+    this.aplicarLetras(acao, true);
     this.refazerPilha.push(acao);
     this.redesenharBase();
     this.notificar();
@@ -443,6 +520,7 @@ export class Tinta {
     const acao = this.refazerPilha.pop();
     if (!acao) return;
     for (const t of acao.tracos) t.apagado = acao.apagar;
+    this.aplicarLetras(acao, false);
     this.historico.push(acao);
     this.redesenharBase();
     this.notificar();
@@ -456,8 +534,16 @@ export class Tinta {
       .map(({ ferramenta, cor, pontos }) => (cor ? { ferramenta, cor, pontos } : { ferramenta, pontos }));
   }
 
-  /** Substitui a tinta pelos traços salvos (o histórico de desfazer começa do zero). */
-  importar(tracos) {
+  /** Letras digitadas, prontas para salvar: {"linha,coluna": "A"}. */
+  exportarLetras() {
+    return Object.fromEntries(this.letras);
+  }
+
+  /** Substitui a tinta pelos traços e letras salvos (o histórico de desfazer começa do zero). */
+  importar(tracos, letras = {}) {
+    this.letras = new Map(Object.entries(letras || {})
+      .filter(([chave, letra]) => /^\d+,\d+$/.test(chave) && /^[A-Z]$/.test(letra)));
+    this.aoMudarLetras([...this.letras.keys()]);
     this.tracos = (tracos || [])
       .filter(t => t && Array.isArray(t.pontos) && t.pontos.length)
       .map(t => {

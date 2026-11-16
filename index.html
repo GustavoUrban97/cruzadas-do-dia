@@ -47,6 +47,9 @@
         <button type="button" data-ferramenta="borracha" title="Borracha" aria-label="Borracha">
           <svg viewBox="0 0 24 24"><path d="M9 19l-4-4a1.5 1.5 0 0 1 0-2.1l8-8a1.5 1.5 0 0 1 2.1 0l4 4a1.5 1.5 0 0 1 0 2.1L12 19z M8.5 9.5l6 6 M9 19h11" fill="none" stroke="#1a1a1a" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg>
         </button>
+        <button type="button" data-ferramenta="teclado" title="Teclado" aria-label="Teclado">
+          <svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2" fill="none" stroke="#1a1a1a" stroke-width="1.7"/><path d="M6 9.5h1 M9.5 9.5h1 M13 9.5h1 M16.5 9.5h1 M6 12.5h1 M9.5 12.5h1 M13 12.5h1 M16.5 12.5h1 M8 15h8" stroke="#1a1a1a" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </button>
         <span class="separador" aria-hidden="true"></span>
         <button type="button" id="desfazer" title="Desfazer" aria-label="Desfazer" disabled>
           <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -72,6 +75,7 @@
       <button type="button" class="botao-texto" data-avaliacao="errei-algumas" aria-pressed="false">Errei algumas</button>
       <button type="button" class="botao-texto" data-avaliacao="nao-terminei" aria-pressed="false">Não terminei</button>
     </span>
+    <span class="resumo-letras" id="resumo-letras" hidden></span>
     <button type="button" class="botao-texto alternar-gabarito" id="alternar-gabarito">Ocultar gabarito</button>
   </div>
   <div class="toast" id="toast" role="status" hidden></div>
@@ -136,6 +140,11 @@
     <!-- Banco: palavras raras da grade, de ponta-cabeça (como no jornal).
          Fica fora do .papel para não mudar a área da tinta. -->
     <div class="banco" id="banco" hidden></div>
+    <!-- Modo teclado: dica da palavra selecionada + teclado próprio (estilo Termo). -->
+    <div class="area-teclado" id="area-teclado" hidden>
+      <p class="dica-atual" id="dica-atual"></p>
+      <div class="teclado" id="teclado" role="group" aria-label="Teclado"></div>
+    </div>
   </main>
 </body>
 </html>
