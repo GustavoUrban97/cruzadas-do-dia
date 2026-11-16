@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Valida todos os puzzles (formato cruzada direta) e regenera puzzles/index.json.
 
+Cada dia tem até três puzzles, um por nível: AAAA-MM-DD-facil.json,
+AAAA-MM-DD-media.json e AAAA-MM-DD-dificil.json.
+
 Uso:  python3 tools/validar.py
 
 Sai com código 1 se algum puzzle estiver inválido. A regra de onde cada
@@ -21,7 +24,8 @@ DICA = "#"
 MAX_DICAS_POR_CASA = 2
 DICA_LONGA = 24  # caracteres; acima disso só avisa
 
-NOME_ARQUIVO = re.compile(r"^\d{4}-\d{2}-\d{2}\.json$")
+NIVEIS = ("facil", "media", "dificil")  # mesma ordem de js/niveis.js
+NOME_ARQUIVO = re.compile(r"^\d{4}-\d{2}-\d{2}-(facil|media|dificil)\.json$")
 LINHA_VALIDA = re.compile(r"^[A-Z#]+$")
 
 # direcao -> (deslocamento até a 1ª letra, sentido da palavra)
@@ -64,14 +68,17 @@ def validar_puzzle(caminho):
     except (OSError, json.JSONDecodeError) as e:
         return None, [f"JSON inválido: {e}"], avisos
 
-    for campo in ("id", "data", "titulo", "largura", "altura", "grade", "dicas"):
+    for campo in ("id", "data", "nivel", "titulo", "largura", "altura", "grade", "dicas"):
         if campo not in puzzle:
             erros.append(f"campo obrigatório ausente: {campo}")
     if erros:
         return puzzle, erros, avisos
 
-    if caminho.stem != puzzle["data"]:
-        erros.append(f"nome do arquivo ({caminho.stem}) diferente do campo data ({puzzle['data']})")
+    if puzzle["nivel"] not in NIVEIS:
+        erros.append(f"nivel inválido: {puzzle['nivel']} (use {', '.join(NIVEIS)})")
+    esperado = f"{puzzle['data']}-{puzzle['nivel']}"
+    if caminho.stem != esperado:
+        erros.append(f"nome do arquivo ({caminho.stem}) diferente de data-nivel ({esperado})")
 
     grade = puzzle["grade"]
     if (puzzle["largura"], puzzle["altura"]) != (LARGURA, ALTURA):
@@ -150,13 +157,13 @@ def validar_puzzle(caminho):
 def main():
     arquivos = sorted(p for p in PASTA.glob("*.json") if p.name != INDICE.name)
     problemas = 0
-    datas = []
+    niveis_por_data = {}
     ids = {}
 
     for caminho in arquivos:
         erros = []
         if not NOME_ARQUIVO.match(caminho.name):
-            erros.append("nome do arquivo deve ser AAAA-MM-DD.json")
+            erros.append("nome do arquivo deve ser AAAA-MM-DD-nivel.json (nivel: facil, media ou dificil)")
         puzzle, erros_puzzle, avisos = validar_puzzle(caminho)
         erros += erros_puzzle
 
@@ -173,19 +180,21 @@ def main():
         if erros:
             problemas += 1
         else:
-            datas.append(puzzle["data"])
-
-    if len(datas) != len(set(datas)):
-        print("✗ datas duplicadas entre arquivos")
-        problemas += 1
+            niveis_por_data.setdefault(puzzle["data"], []).append(puzzle["nivel"])
 
     if problemas:
         print(f"\n{problemas} puzzle(s) com problema. index.json não foi atualizado.")
         return 1
 
-    conteudo = json.dumps({"datas": sorted(datas)}, ensure_ascii=False, indent=2) + "\n"
+    # {"datas": {"AAAA-MM-DD": ["facil", "media", "dificil"]}}, datas e níveis em ordem
+    indice = {
+        data: sorted(niveis, key=NIVEIS.index)
+        for data, niveis in sorted(niveis_por_data.items())
+    }
+    total = sum(len(n) for n in indice.values())
+    conteudo = json.dumps({"datas": indice}, ensure_ascii=False, indent=2) + "\n"
     INDICE.write_text(conteudo, encoding="utf-8", newline="\n")
-    print(f"\n{len(datas)} puzzle(s) válido(s). puzzles/index.json atualizado.")
+    print(f"\n{total} puzzle(s) válido(s) em {len(indice)} dia(s). puzzles/index.json atualizado.")
     return 0
 
 

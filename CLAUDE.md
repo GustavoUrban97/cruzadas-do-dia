@@ -1,6 +1,6 @@
 # Cruzadas do Dia — cruzada direta para S Pen
 
-Página web pessoal de palavras cruzadas diárias, feita para ser resolvida **à caneta (S Pen) no Samsung Galaxy Tab S9**, com a sensação de fazer a cruzada do jornal no papel. Um puzzle novo por dia, trocando à 00h (horário de Brasília), no espírito do Termo.
+Página web pessoal de palavras cruzadas diárias, feita para ser resolvida **à caneta (S Pen) no Samsung Galaxy Tab S9**, com a sensação de fazer a cruzada do jornal no papel. **Três cruzadas por dia (fácil, média e difícil)**, trocando à 00h (horário de Brasília), no espírito do Termo.
 
 O estilo é **cruzada direta** (como as revistas de banca): as dicas ficam dentro da grade, em casas próprias, com uma seta indicando onde a resposta começa e em que direção corre. Não há lista de dicas separada nem numeração.
 
@@ -25,7 +25,7 @@ Publicado no **GitHub Pages** (repositório público) e usado como **página com
 
 - **HTML + CSS + JavaScript puro (ES modules), sem etapa de build.** O GitHub Pages serve os arquivos como estão. Sem frameworks e sem npm no app.
 - `sw.js` (service worker): guarda os arquivos da página para abrir sem internet e controla as versões (aviso "Atualização disponível"). Não há manifesto: a página não é instalável.
-- Persistência local: **IndexedDB** para a tinta (um registro por data) e, a partir da Etapa 5, para o registro de cada dia. `localStorage` só para preferências leves (ferramenta e cor ativas). Sempre com try/catch.
+- Persistência local: **IndexedDB** para a tinta e o registro, com chave `[data, nivel]` (banco versão 3). `localStorage` só para preferências leves (ferramenta, cor, nível e gabarito visível). Sempre com try/catch.
 - Alvo: Chrome no Android 14+ (Tab S9). Não precisa suportar outros navegadores, mas não deve quebrar no Chrome desktop (útil para desenvolver com mouse).
 
 ## Estrutura do repositório
@@ -41,9 +41,12 @@ js/armazenamento.js# IndexedDB
 js/datas.js        # "hoje" em America/Sao_Paulo, formatação
 js/diagnostico.js  # tela ?debug=1
 js/historico.js    # painel "Meu histórico": estatísticas, calendário, backup
+js/niveis.js       # os três níveis (fácil, média, difícil)
 puzzles/
   index.json       # lista de datas disponíveis (gerado pelo validador)
-  2026-11-07.json
+  2026-11-07-facil.json   # um arquivo por nível: -facil, -media, -dificil
+  2026-11-07-media.json
+  2026-11-07-dificil.json
 tools/
   validar.py
   gerar_grade.py
@@ -78,14 +81,15 @@ Usar **Pointer Events** (`pointerType`):
 - Setas pequenas na borda da casa onde a resposta começa, sem atrapalhar a escrita da letra.
 - A camada de tinta cobre a grade inteira (casas de letra e de dica aceitam escrita).
 - Traços salvos em **coordenadas normalizadas** relativas à grade, para continuarem no lugar ao girar a tela ou redimensionar.
-- Cabeçalho compacto (uma linha): data por extenso ("domingo, 15 de novembro de 2026"), número do puzzle, versão discreta e a barra de ferramentas.
+- Cabeçalho em **duas barras**: em cima o dia (data por extenso, seletor **Fácil · Média · Difícil**, número do puzzle e versão discretos, Ontem/Hoje e o ícone do histórico); embaixo a escrita (caneta e cores, lápis, borracha, desfazer, refazer) e o **Terminei** à direita. Em retrato a grade é limitada pela largura, então a segunda barra não a diminui. Tudo precisa caber em ~600 px de largura (o ano da data some abaixo de 760 px).
 - Sem rolagem acidental nem zoom do navegador ao escrever (`user-scalable=no` no viewport é aceitável aqui).
 - Margem lateral de ~24px em volta da grade: no Tab S9 com navegação por gestos, escrever colado na borda dispara o "voltar" do Android. Além disso, depois de cada traço o app arma uma entrada extra no histórico, para o primeiro gesto de voltar acidental não sair da página (o Chrome só respeita `pushState` feito logo após uma ação do usuário, por isso é rearmado no fim do traço).
 
 ## Ciclo diário
 
 - "Hoje" = data atual em `America/Sao_Paulo`, via `Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' })` (formato AAAA-MM-DD). Nunca usar a data UTC.
-- Puzzle do dia: `puzzles/AAAA-MM-DD.json`. Se a data não estiver em `puzzles/index.json`, usar um fallback determinístico (dias desde uma data inicial, ciclando pelos puzzles disponíveis) e mostrar um aviso discreto de que o banco precisa de puzzles novos.
+- Puzzles do dia: `puzzles/AAAA-MM-DD-nivel.json` (nivel = `facil`, `media` ou `dificil`). Se a data não tiver o nível em `puzzles/index.json`, usar um fallback determinístico por nível (dias desde o primeiro puzzle daquele nível, ciclando pelos disponíveis) e mostrar um aviso discreto de que o banco precisa de puzzles novos.
+- **Níveis:** cada nível é uma cruzada independente, com tinta, Terminei, gabarito e avaliação próprios. Os três têm 13×17; a dificuldade vem das palavras (comuns no fácil, menos usuais no difícil) e do estilo das dicas (diretas no fácil, indiretas e com jogo de palavras no difícil). O app abre no último nível usado (`?nivel=` força um). O que foi salvo antes dos níveis virou "Média".
 - Se a página estiver aberta na virada da meia-noite (checar a cada minuto e ao voltar ao primeiro plano via `visibilitychange`), mostrar "Novo puzzle disponível" sem trocar à força no meio de um traço.
 - A tinta de cada dia é salva por data, ao fim de cada traço.
 
@@ -103,10 +107,10 @@ Como no jornal, sem ajuda durante o dia:
 - **Hoje:** só a folha. Um botão discreto **"Terminei"** registra que concluí naquele dia (opcional); tocar de novo desfaz. Botão "Ontem" abre o gabarito de ontem, e um lembrete aparece se ontem foi jogado e ainda não avaliado.
 - **Gabarito de ontem:** mostra a grade de ontem com a minha tinta e as respostas sobrepostas **em verde, levemente transparente** (verde para não confundir com nenhuma das cores de caneta). Ali eu avalio o dia: **Acertei tudo**, **Errei algumas** ou **Não terminei** (pode trocar depois). As letras verdes ficam por baixo da tinta e podem ser ocultadas. Qualquer dia passado abre assim; dia futuro nunca mostra respostas.
 - Dia em que nem abri a página: **não jogou**.
-- **Sequência:** dias seguidos em que **terminei** o puzzle (acertando tudo ou errando algumas). "Não terminei" e "não jogou" quebram a sequência, assim como dia jogado sem "Terminei" nem avaliação. "Terminei" ainda sem avaliação conta. Hoje em andamento não quebra.
-- **Estatísticas** no estilo do Termo: dias jogados, % de "acertei tudo", sequência atual e melhor sequência, distribuição entre acertei tudo / errei algumas / não terminei. A % é sobre os dias avaliados. Fica no painel "Meu histórico" (ícone de gráfico no cabeçalho).
+- **Sequência** (por nível): dias seguidos em que **terminei** o puzzle (acertando tudo ou errando algumas). "Não terminei" e "não jogou" quebram a sequência, assim como dia jogado sem "Terminei" nem avaliação. "Terminei" ainda sem avaliação conta. Hoje em andamento não quebra.
+- **Estatísticas** no estilo do Termo: dias jogados, % de "acertei tudo", sequência atual e melhor sequência, distribuição entre acertei tudo / errei algumas / não terminei. A % é sobre os dias avaliados. Fica no painel "Meu histórico" (ícone de gráfico no cabeçalho), com uma aba por nível: cada nível tem estatísticas, sequência e calendário próprios, como no Termo.
 - **Histórico:** calendário dos dias com a cor de cada um; tocar abre o puzzle daquele dia com a minha tinta e o gabarito. Dias passados continuam editáveis, mas editar não altera o registro já marcado.
-- **Backup:** exportar toda a tinta e o registro dos dias como um arquivo JSON e importar de volta (troca de tablet ou dados do Chrome apagados). Importar substitui, neste aparelho, os dias que estão no arquivo; os outros ficam.
+- **Backup:** exportar toda a tinta e o registro dos dias como um arquivo JSON e importar de volta (troca de tablet ou dados do Chrome apagados). Formato 2 (cada entrada com `nivel`); um backup no formato 1, de antes dos níveis, entra como "Média". Importar substitui, neste aparelho, os puzzles que estão no arquivo; os outros ficam.
 
 ## Formato do puzzle (JSON)
 
@@ -114,6 +118,7 @@ Como no jornal, sem ajuda durante o dia:
 {
   "id": 1,
   "data": "2026-11-07",
+  "nivel": "media",
   "titulo": "Direta do sábado",
   "autor": "Gustavo",
   "largura": 13,
@@ -126,7 +131,8 @@ Como no jornal, sem ajuda durante o dia:
 }
 ```
 
-- **Tamanho fixo: 13 colunas × 17 linhas**, todo dia.
+- **Tamanho fixo: 13 colunas × 17 linhas**, todo dia e nos três níveis.
+- `nivel`: `facil`, `media` ou `dificil`; o arquivo se chama `AAAA-MM-DD-nivel.json`. O `id` é único entre todos os puzzles.
 - `#` = casa de dica. Casa `#` sem nenhuma dica aparece como casa preta. Letras maiúsculas sem acento (padrão de cruzadas brasileiras).
 - Cada dica fica na casa `(linha, coluna)`, que precisa ser `#`. No máximo **2 dicas por casa**; a primeira da lista ocupa a metade de cima.
 - `direcao` (de onde começa a resposta, a partir da casa da dica):
@@ -142,7 +148,7 @@ Como no jornal, sem ajuda durante o dia:
 
 Scripts Python, fora do app:
 
-1. `validar.py` — lê todos os JSON de `puzzles/` e falha se: grade diferente de 13×17; caractere inválido; dica fora de casa `#` ou apontando para casa que não é letra; mais de 2 dicas na mesma casa; palavra da grade (2+ letras) sem dica, ou com mais de uma; `resposta` não bate com a grade; palavra repetida no mesmo puzzle; datas duplicadas ou nome do arquivo diferente do campo `data`. Avisa (sem falhar) sobre dicas longas demais. Ao final, **regenera `puzzles/index.json`** com a lista ordenada de datas.
+1. `validar.py` — lê todos os JSON de `puzzles/` e falha se: grade diferente de 13×17; caractere inválido; dica fora de casa `#` ou apontando para casa que não é letra; mais de 2 dicas na mesma casa; palavra da grade (2+ letras) sem dica, ou com mais de uma; `resposta` não bate com a grade; palavra repetida no mesmo puzzle; `nivel` ausente ou inválido; nome do arquivo diferente de `data-nivel`; `id` repetido. Avisa (sem falhar) sobre dicas longas demais. Ao final, **regenera `puzzles/index.json`** no formato `{"datas": {"AAAA-MM-DD": ["facil", "media", "dificil"]}}`.
 2. `gerar_grade.py` — monta um padrão 13×17 de casas de dica e preenche com palavras comuns em português (lista de frequência, por exemplo o pacote `wordfreq`, removendo acentos), sem repetir palavras, atribui cada palavra a uma casa de dica vizinha (no máximo 2 por casa) e gera o JSON com os textos das dicas em branco para eu (ou uma IA) escrever.
 3. Dicas escritas em lotes (um mês por vez) e revisadas por mim. Não copiar puzzles de revistas, jornais ou apps.
 
@@ -161,7 +167,8 @@ Scripts Python, fora do app:
 4. **Cores e offline:** caneta preta/azul/vermelha, service worker (offline + aviso de atualização). Sem manifesto/instalação. ✔
 5. **Conferência:** botão "Terminei", gabarito de ontem em verde, avaliação do dia (acertei tudo / errei algumas / não terminei), registro do dia no IndexedDB. ✔
 6. **Histórico, estatísticas e backup:** calendário, sequência, estatísticas estilo Termo, exportar/importar. ✔
-7. **Conteúdo:** `gerar_grade.py` e um banco inicial de 30 puzzles.
+7. **Cabeçalho em duas barras e três níveis:** seletor Fácil/Média/Difícil, tinta e registro por nível (migração do que já existia para "Média"), histórico com abas por nível, backup formato 2, um puzzle de exemplo de cada nível. ✔
+8. **Conteúdo:** `gerar_grade.py` (com opção de nível) e um banco inicial de 30 dias × 3 níveis.
 
 ## Critérios de aceite
 

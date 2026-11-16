@@ -1,6 +1,6 @@
 # Cruzadas do Dia
 
-Palavras cruzadas diárias no estilo **cruzada direta** (dicas dentro da grade, com setas), para resolver à caneta (S Pen) no Galaxy Tab S9, como na revista. Grade de 13×17, um puzzle novo por dia, trocando à meia-noite de Brasília.
+Palavras cruzadas diárias no estilo **cruzada direta** (dicas dentro da grade, com setas), para resolver à caneta (S Pen) no Galaxy Tab S9, como na revista. Grade de 13×17, três cruzadas novas por dia (fácil, média e difícil), trocando à meia-noite de Brasília.
 
 Página web estática (HTML, CSS e JavaScript puro), publicada no GitHub Pages e usada direto no Chrome do tablet. Abre sem internet e avisa quando há versão nova.
 
@@ -16,7 +16,7 @@ Abra `http://localhost:8000`. Para abrir um dia específico: `http://localhost:8
 
 ## Adicionar puzzles
 
-1. Crie `puzzles/AAAA-MM-DD.json` seguindo o formato de `puzzles/2026-11-07.json`: grade 13×17, `#` = casa de dica, letras maiúsculas sem acento. Cada dica diz em que casa fica (`linha`, `coluna`) e a direção da seta (`direita`, `baixo`, `baixo-direita` ou `direita-baixo`); no máximo 2 dicas por casa. Detalhes no `CLAUDE.md`.
+1. Cada dia tem três cruzadas, uma por nível: crie `puzzles/AAAA-MM-DD-facil.json`, `-media.json` e `-dificil.json` seguindo o formato de `puzzles/2026-11-07-media.json` (com o campo `"nivel"`): grade 13×17, `#` = casa de dica, letras maiúsculas sem acento. Cada dica diz em que casa fica (`linha`, `coluna`) e a direção da seta (`direita`, `baixo`, `baixo-direita` ou `direita-baixo`); no máximo 2 dicas por casa. Detalhes no `CLAUDE.md`.
 2. Rode `python3 tools/validar.py`. Ele confere se toda palavra tem dica, se as setas e respostas batem com a grade e regenera `puzzles/index.json`.
 3. Faça commit e push. O GitHub Actions valida de novo a cada push.
 
@@ -28,6 +28,7 @@ Abra https://gustavourban97.github.io/cruzadas-do-dia/ no Chrome. A tinta fica s
 - O ícone de gráfico abre **Meu histórico**: estatísticas, calendário (tocar num dia abre aquele puzzle) e backup. Exporte o backup de vez em quando: a tinta fica só neste aparelho.
 - `?debug=1` no fim do endereço mostra os eventos da caneta (diagnóstico).
 - `?data=AAAA-MM-DD` abre um dia específico (dias passados mostram o gabarito).
+- `?nivel=facil|media|dificil` abre um nível (o app lembra o último usado).
 - `?hoje=AAAA-MM-DD` finge que hoje é outra data (para testar).
 
 ## Publicar uma versão nova

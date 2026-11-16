@@ -3,6 +3,7 @@
 
 import { dataValida, somarDias, dataCurta } from './datas.js';
 import { lerTudo, gravarBackup } from './armazenamento.js';
+import { NOMES_NIVEIS, nivelValido } from './niveis.js';
 
 const $ = id => document.getElementById(id);
 
@@ -20,16 +21,18 @@ const ROTULOS = {
 // ---------- Cálculo (funções puras) ----------
 
 /**
- * Estado de cada dia jogado: avaliação, se houver; senão "terminei" (marcou
- * Terminei e não avaliou) ou "jogou" (só tem tinta). Dia sem nada = não jogou.
+ * Estado de cada dia jogado num nível: avaliação, se houver; senão "terminei"
+ * (marcou Terminei e não avaliou) ou "jogou" (só tem tinta). Dia sem nada = não jogou.
+ * Cada nível tem as suas estatísticas, como no Termo.
  */
-export function estadosDosDias({ tinta, registro }) {
+export function estadosDosDias({ tinta, registro }, nivel) {
   const estados = new Map();
   for (const t of tinta) {
-    if (t && dataValida(t.data) && Array.isArray(t.tracos) && t.tracos.length) estados.set(t.data, 'jogou');
+    if (!t || t.nivel !== nivel || !dataValida(t.data)) continue;
+    if (Array.isArray(t.tracos) && t.tracos.length) estados.set(t.data, 'jogou');
   }
   for (const r of registro) {
-    if (!r || !dataValida(r.data)) continue;
+    if (!r || r.nivel !== nivel || !dataValida(r.data)) continue;
     if (r.avaliacao && ROTULOS[r.avaliacao]) estados.set(r.data, r.avaliacao);
     else if (r.terminei) estados.set(r.data, 'terminei');
   }
@@ -77,32 +80,47 @@ export function calcularEstatisticas(estados, hoje) {
  * Liga o botão do cabeçalho ao painel.
  *  - hoje():        data de hoje (AAAA-MM-DD), respeitando ?hoje= nos testes;
  *  - antesDeLer():  grava a tinta aberta, para o dia atual entrar na conta;
- *  - irPara(data):  abre o puzzle daquele dia;
+ *  - nivel:         nível aberto (a aba que aparece primeiro);
+ *  - irPara(data, nivel): abre o puzzle daquele dia e nível;
  *  - aoImportar():  chamado depois de importar (a página para de salvar e recarrega).
  */
-export function iniciarHistorico({ hoje, antesDeLer, irPara, aoImportar }) {
+export function iniciarHistorico({ hoje, nivel, antesDeLer, irPara, aoImportar }) {
   const painel = $('historico');
+  const abas = [...document.querySelectorAll('[data-aba-nivel]')];
+  let aba = nivel;       // nível mostrado no painel
+  let dados = { tinta: [], registro: [] };
   let mesVisto = null;   // 'AAAA-MM'
   let estados = new Map();
   let primeiroMes = null;
 
-  const abrir = async () => {
-    try { await antesDeLer(); } catch { /* segue com o que houver */ }
-    try {
-      estados = estadosDosDias(await lerTudo());
-    } catch (erro) {
-      console.error(erro);
-      estados = new Map();
-      $('historico-erro').textContent = 'Não foi possível ler o histórico neste aparelho.';
-    }
+  const mostrarAba = novaAba => {
+    aba = novaAba;
+    abas.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.abaNivel === aba)));
+    estados = estadosDosDias(dados, aba);
     const diaDeHoje = hoje();
     const datas = [...estados.keys()].filter(d => d <= diaDeHoje).sort();
     primeiroMes = (datas[0] || diaDeHoje).slice(0, 7);
-    mesVisto = diaDeHoje.slice(0, 7);
+    if (!mesVisto || mesVisto < primeiroMes) mesVisto = diaDeHoje.slice(0, 7);
     desenharEstatisticas(calcularEstatisticas(estados, diaDeHoje));
     desenharCalendario();
+  };
+
+  const abrir = async () => {
+    try { await antesDeLer(); } catch { /* segue com o que houver */ }
+    $('historico-erro').textContent = '';
+    try {
+      dados = await lerTudo();
+    } catch (erro) {
+      console.error(erro);
+      dados = { tinta: [], registro: [] };
+      $('historico-erro').textContent = 'Não foi possível ler o histórico neste aparelho.';
+    }
+    mesVisto = hoje().slice(0, 7);
+    mostrarAba(aba);
     if (!painel.open) painel.showModal();
   };
+
+  abas.forEach(b => b.addEventListener('click', () => mostrarAba(b.dataset.abaNivel)));
 
   const desenharCalendario = () => {
     const diaDeHoje = hoje();
@@ -136,9 +154,9 @@ export function iniciarHistorico({ hoje, antesDeLer, irPara, aoImportar }) {
       if (dia > diaDeHoje) {
         botao.disabled = true;
       } else {
-        botao.title = `${dataCurta(dia)}: ${estado ? ROTULOS[estado] : 'não jogou'}`;
+        botao.title = `${dataCurta(dia)} (${NOMES_NIVEIS[aba]}): ${estado ? ROTULOS[estado] : "não jogou"}`;
         const destino = dia;
-        botao.addEventListener('click', () => { painel.close(); irPara(destino); });
+        botao.addEventListener('click', () => { painel.close(); irPara(destino, aba); });
       }
       grade.append(botao);
     }
@@ -176,11 +194,13 @@ export function iniciarHistorico({ hoje, antesDeLer, irPara, aoImportar }) {
     if (!arquivo) return;
     try {
       const backup = lerBackup(await arquivo.text());
-      const datas = [...new Set([...backup.tinta, ...backup.registro].map(x => x.data))].sort();
+      const itens = [...backup.tinta, ...backup.registro];
+      const puzzles = new Set(itens.map(x => `${x.data}-${x.nivel}`)).size;
+      const datas = [...new Set(itens.map(x => x.data))].sort();
       if (datas.length === 0) { alert('O arquivo não tem nenhum dia salvo.'); return; }
       const ok = confirm(
-        `O arquivo tem ${datas.length} dia(s), de ${formatar(datas[0])} a ${formatar(datas.at(-1))}.\n\n` +
-        'Esses dias serão substituídos neste aparelho pelo que está no arquivo; os outros continuam como estão.\n\nContinuar?');
+        `O arquivo tem ${puzzles} puzzle(s) de ${datas.length} dia(s), de ${formatar(datas[0])} a ${formatar(datas.at(-1))}.\n\n` +
+        'Esses puzzles serão substituídos neste aparelho pelo que está no arquivo; os outros continuam como estão.\n\nContinuar?');
       if (!ok) return;
       await aoImportar(() => gravarBackup(backup));
     } catch (erro) {
@@ -191,7 +211,6 @@ export function iniciarHistorico({ hoje, antesDeLer, irPara, aoImportar }) {
 }
 
 function desenharEstatisticas({ jogados, porcentagem, atual, melhor, contagem }) {
-  $('historico-erro').textContent = '';
   $('est-jogados').textContent = jogados;
   $('est-porcentagem').textContent = porcentagem;
   $('est-atual').textContent = atual;
@@ -226,7 +245,7 @@ async function exportar(hoje) {
   const { tinta, registro } = await lerTudo();
   const conteudo = JSON.stringify({
     app: 'cruzadas-do-dia',
-    formato: 1,
+    formato: 2,            // 2: cada entrada tem "nivel"
     exportadoEm: new Date().toISOString(),
     tinta,
     registro,
@@ -248,8 +267,11 @@ export function lerBackup(texto) {
   if (!dados || dados.app !== 'cruzadas-do-dia' || !Array.isArray(dados.tinta) || !Array.isArray(dados.registro)) {
     throw new Error('não parece um backup do Cruzadas do Dia');
   }
-  if (dados.formato !== 1) throw new Error(`formato de backup desconhecido (${dados.formato})`);
-  const tinta = dados.tinta.filter(t => t && dataValida(t.data) && Array.isArray(t.tracos));
-  const registro = dados.registro.filter(r => r && dataValida(r.data) && typeof r === 'object');
+  if (dados.formato !== 1 && dados.formato !== 2) throw new Error(`formato de backup desconhecido (${dados.formato})`);
+  // Formato 1 (antes dos três níveis): tudo era o puzzle que hoje é a "Média".
+  const comNivel = item => (dados.formato === 1 ? { ...item, nivel: 'media' } : item);
+  const valido = item => item && typeof item === 'object' && dataValida(item.data) && nivelValido(item.nivel);
+  const tinta = dados.tinta.map(comNivel).filter(t => valido(t) && Array.isArray(t.tracos));
+  const registro = dados.registro.map(comNivel).filter(valido);
   return { tinta, registro };
 }

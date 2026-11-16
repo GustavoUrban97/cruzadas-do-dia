@@ -32,52 +32,83 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
-/* ---------- Cabeçalho (uma linha) ---------- */
+/* ---------- Cabeçalho (duas barras: o dia e a escrita) ---------- */
 
 .cabecalho {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.2rem 0.5rem 0.2rem 0.75rem;
   border-bottom: 1.5px solid var(--linha);
   white-space: nowrap;
+}
+
+.barra {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.15rem 0.5rem 0.15rem 0.75rem;
+}
+
+.barra-escrita {
+  border-top: 1px solid #d8d0bd;
+  justify-content: space-between;
 }
 
 .data {
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
+  flex-shrink: 0;
+}
+
+@media (max-width: 760px) {
+  .data .ano { display: none; }
+}
+
+/* Nome do puzzle e versão: discretos, encolhem até sumir se faltar espaço */
+.info {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-@media (max-width: 920px) {
-  .data .ano { display: none; }
-  .data { flex-shrink: 0; }  /* a data inteira aparece; o título do puzzle encolhe */
-}
-
-.edicao {
-  margin: 0;
-  flex-shrink: 50;          /* encolhe antes da data */
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-style: italic;
   color: var(--tinta-suave);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-align: right;
 }
 
 .versao {
+  margin-left: 0.4rem;
+  font-style: normal;
   font-size: 0.7rem;
-  color: var(--tinta-suave);
   opacity: 0.6;
 }
+
+/* Seletor de nível (cabeçalho e histórico) */
+.niveis {
+  display: inline-flex;
+  flex-shrink: 0;
+  border: 1.5px solid var(--linha);
+  border-radius: 17px;
+  overflow: hidden;
+}
+
+.nivel {
+  height: 31px;
+  padding: 0 0.7rem;
+  border: 0;
+  border-left: 1px solid var(--linha);
+  background: transparent;
+  color: var(--tinta);
+  font: inherit;
+  font-size: 0.85rem;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.nivel:first-child { border-left: 0; }
+.nivel[aria-pressed="true"] { background: var(--linha); color: var(--papel); }
 
 /* ---------- Barra de ferramentas ---------- */
 
 .ferramentas {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -152,16 +183,8 @@ body {
   opacity: 0.4;
 }
 
-/* ---------- Ações do dia (Terminei / Ontem / Hoje) ---------- */
 
-.acoes-dia {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-.acoes-dia + .ferramentas { margin-left: 0.5rem; }
-
+/* Botões de texto (Terminei, Ontem, Hoje, avaliação) */
 .botao-texto {
   height: 34px;
   padding: 0 0.6rem;
@@ -214,6 +237,7 @@ body {
 .painel h2 { margin: 0; font-size: 1.3rem; }
 .painel h3 { margin: 1rem 0 0.4rem; font-size: 0.95rem; }
 .painel-topo { display: flex; align-items: center; justify-content: space-between; }
+.abas-nivel { margin-top: 0.4rem; }
 .historico-erro { margin: 0; color: #b3261e; font-size: 0.85rem; font-style: italic; }
 .historico-erro:empty { display: none; }
 

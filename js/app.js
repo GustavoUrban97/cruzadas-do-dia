@@ -1,16 +1,17 @@
-// Inicialização e escolha do puzzle por data.
+// Inicialização e escolha do puzzle por data e nível.
 
 import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre, somarDias } from './datas.js';
 import { renderizarGrade, ajustarTamanho, colocarGabarito } from './grade.js';
 import { Tinta } from './tinta.js';
 import { iniciarDiagnostico } from './diagnostico.js';
 import { iniciarHistorico } from './historico.js';
+import { NIVEIS, NOMES_NIVEIS, nivelValido } from './niveis.js';
 import { carregarTinta, salvarTinta, pedirPersistencia, carregarRegistro, atualizarRegistro } from './armazenamento.js';
 
 // Versão do app, mostrada discretamente no cabeçalho.
 // IMPORTANTE: precisa ser igual à VERSAO de sw.js, que deve subir a cada mudança
 // em HTML/CSS/JS (é o que faz o tablet perceber que há versão nova).
-const VERSAO = 9;
+const VERSAO = 10;
 
 const $ = id => document.getElementById(id);
 const parametros = new URLSearchParams(location.search);
@@ -19,12 +20,12 @@ const parametros = new URLSearchParams(location.search);
 const HOJE_FINGIDO = dataValida(parametros.get('hoje')) ? parametros.get('hoje') : null;
 const hoje = () => HOJE_FINGIDO ?? hojeEmBrasilia();
 
-/** Endereço da página para uma data, mantendo ?hoje e ?debug. Hoje = sem ?data. */
-function endereco(data) {
+/** Endereço da página para um puzzle, mantendo ?hoje e ?debug. Hoje = sem ?data. */
+function endereco(data, nivel) {
   const p = new URLSearchParams(location.search);
   if (data === hoje()) p.delete('data'); else p.set('data', data);
-  const busca = p.toString();
-  return location.pathname + (busca ? `?${busca}` : '');
+  p.set('nivel', nivel);
+  return `${location.pathname}?${p}`;
 }
 
 async function buscarJSON(caminho) {
@@ -33,17 +34,24 @@ async function buscarJSON(caminho) {
   return resposta.json();
 }
 
+/** Datas que têm puzzle do nível, em ordem (index.json: {"datas": {"AAAA-MM-DD": [níveis]}}). */
+function datasDoNivel(indice, nivel) {
+  return Object.keys(indice).filter(d => indice[d].includes(nivel)).sort();
+}
+
 /**
- * Decide qual arquivo de puzzle abrir para a data pedida.
- * Se a data não existe no banco, usa um fallback determinístico:
- * dias desde o primeiro puzzle, ciclando pelos disponíveis.
+ * Decide qual arquivo abrir para a data e o nível pedidos.
+ * Se não houver puzzle desse nível na data, usa um fallback determinístico:
+ * dias desde o primeiro puzzle do nível, ciclando pelos disponíveis.
  */
-function escolherPuzzle(data, datasDisponiveis) {
-  if (datasDisponiveis.includes(data)) return { arquivo: data, substituto: false };
-  const n = datasDisponiveis.length;
-  const dias = diasEntre(datasDisponiveis[0], data);
-  const indice = ((dias % n) + n) % n;
-  return { arquivo: datasDisponiveis[indice], substituto: true };
+function escolherPuzzle(data, nivel, indice) {
+  const datas = datasDoNivel(indice, nivel);
+  if (datas.length === 0) throw new Error(`ainda não há cruzada ${NOMES_NIVEIS[nivel].toLowerCase()} no banco`);
+  if (datas.includes(data)) return { arquivo: `${data}-${nivel}`, dataDoArquivo: data, substituto: false };
+  const n = datas.length;
+  const dias = diasEntre(datas[0], data);
+  const escolhida = datas[((dias % n) + n) % n];
+  return { arquivo: `${escolhida}-${nivel}`, dataDoArquivo: escolhida, substituto: true };
 }
 
 // ---------- Preferências leves (localStorage, sempre com try/catch) ----------
@@ -112,8 +120,8 @@ function mostrarToast(texto) {
 
 // ---------- Salvar a tinta (IndexedDB) ----------
 
-/** Salva os traços da data; várias mudanças seguidas viram uma gravação só. */
-function criarSalvador(data, tinta) {
+/** Salva os traços do puzzle; várias mudanças seguidas viram uma gravação só. */
+function criarSalvador(data, nivel, tinta) {
   let fila = Promise.resolve();
   let agendado = false;
   let falhou = false;
@@ -121,7 +129,7 @@ function criarSalvador(data, tinta) {
     if (agendado) return fila;
     agendado = true;
     fila = fila
-      .then(() => { agendado = false; return salvarTinta(data, tinta.exportar()); })
+      .then(() => { agendado = false; return salvarTinta(data, nivel, tinta.exportar()); })
       .catch(erro => {
         agendado = false;
         console.error(erro);
@@ -217,42 +225,44 @@ function registrarServiceWorker(antesDeRecarregar) {
   }).catch(erro => console.warn('Service worker não registrado:', erro));
 }
 
-/** Busca os puzzles dos próximos 7 dias para o service worker guardar (uso offline). */
-function precarregarProximos(hoje, datas) {
+/** Busca os puzzles (dos três níveis) dos próximos 7 dias para o service worker guardar (uso offline). */
+function precarregarProximos(hoje, indice) {
   for (let i = 1; i <= 7; i++) {
     const dia = somarDias(hoje, i);
-    if (datas.includes(dia)) fetch(`puzzles/${dia}.json`, { cache: 'no-cache' }).catch(() => {});
+    for (const nivel of indice[dia] || []) {
+      fetch(`puzzles/${dia}-${nivel}.json`, { cache: 'no-cache' }).catch(() => {});
+    }
   }
 }
 
-// ---------- Registro do dia: Terminei, gabarito e avaliação ----------
+// ---------- Registro do puzzle: Terminei, gabarito e avaliação ----------
 
 /**
- * Mostra as ações que fazem sentido para a data aberta:
- *  - hoje: "Terminei" (marca/desmarca) e "Ontem" (abre o gabarito de ontem);
- *  - dia passado: gabarito em verde, avaliação do dia e "Hoje";
+ * Mostra as ações que fazem sentido para o puzzle aberto (data + nível):
+ *  - hoje: "Terminei" (marca/desmarca) e "Ontem" (o gabarito de ontem, mesmo nível);
+ *  - dia passado: gabarito em verde, avaliação e "Hoje";
  *  - dia futuro (só em teste): apenas "Hoje".
  * Editar a tinta de um dia passado não mexe no registro.
  */
-async function configurarDia({ data, arquivo, irPara }) {
+async function configurarDia({ data, nivel, arquivo, irPara }) {
   const diaDeHoje = hoje();
   const passado = data < diaDeHoje;
 
   let registro = null;
   try {
-    registro = await carregarRegistro(data);
+    registro = await carregarRegistro(data, nivel);
   } catch (erro) {
     console.error(erro);
   }
 
   const gravar = async (mudancas, mensagem) => {
     try {
-      registro = await atualizarRegistro(data, { puzzle: arquivo, ...mudancas });
+      registro = await atualizarRegistro(data, nivel, { puzzle: arquivo, ...mudancas });
       if (mensagem) mostrarToast(mensagem);
       return true;
     } catch (erro) {
       console.error(erro);
-      mostrarAviso('Atenção: não foi possível salvar o registro do dia neste aparelho.');
+      mostrarAviso('Atenção: não foi possível salvar o registro neste aparelho.');
       return false;
     }
   };
@@ -275,9 +285,10 @@ async function configurarDia({ data, arquivo, irPara }) {
     terminei.hidden = false;
     terminei.addEventListener('click', async () => {
       const marcar = !(registro && registro.terminei);
+      const nome = NOMES_NIVEIS[nivel].toLowerCase();
       const ok = await gravar(
         { terminei: marcar, termineiEm: marcar ? new Date().toISOString() : null },
-        marcar ? 'Registrado: terminei hoje. O gabarito sai amanhã.' : 'Registro de hoje desfeito.',
+        marcar ? `Registrado: terminei a ${nome} de hoje. O gabarito sai amanhã.` : 'Registro desfeito.',
       );
       if (ok) pintar();
     });
@@ -286,7 +297,7 @@ async function configurarDia({ data, arquivo, irPara }) {
     const botaoOntem = $('ir-ontem');
     botaoOntem.hidden = false;
     botaoOntem.addEventListener('click', () => irPara(ontem));
-    lembrarOntem(ontem, () => irPara(ontem));
+    lembrarOntem(ontem, nivel, irPara);
   }
 
   if (passado) {
@@ -301,7 +312,7 @@ async function configurarDia({ data, arquivo, irPara }) {
     mostrar(lerPreferencia('gabarito', 'mostrar') !== 'ocultar');
     alternar.addEventListener('click', () => mostrar(!grade.classList.contains('com-gabarito')));
 
-    // Avaliação do dia: pode ser trocada depois, se tocou errado.
+    // Avaliação: pode ser trocada depois, se tocou errado.
     const opcoes = [...document.querySelectorAll('[data-avaliacao]')];
     const pintar = () => opcoes.forEach(b =>
       b.setAttribute('aria-pressed', String(Boolean(registro) && registro.avaliacao === b.dataset.avaliacao)));
@@ -310,7 +321,7 @@ async function configurarDia({ data, arquivo, irPara }) {
       if (registro && registro.avaliacao === b.dataset.avaliacao) return;
       const ok = await gravar(
         { avaliacao: b.dataset.avaliacao, avaliadoEm: new Date().toISOString() },
-        `Registrado: ${b.textContent.toLowerCase()} em ${dataCurta(data)}.`,
+        `Registrado: ${b.textContent.toLowerCase()} na ${NOMES_NIVEIS[nivel].toLowerCase()} de ${dataCurta(data)}.`,
       );
       if (ok) pintar();
     }));
@@ -318,18 +329,35 @@ async function configurarDia({ data, arquivo, irPara }) {
   }
 }
 
-/** Ontem jogado (tinta ou "Terminei") e ainda sem avaliação: mostra um lembrete discreto. */
-async function lembrarOntem(ontem, abrir) {
-  try {
-    const [registro, tracos] = await Promise.all([carregarRegistro(ontem), carregarTinta(ontem)]);
-    if (registro && registro.avaliacao) return;
-    if (!(registro && registro.terminei) && tracos.length === 0) return;
-    const faixa = $('lembrete-ontem');
-    faixa.hidden = false;
-    faixa.onclick = abrir;
-  } catch (erro) {
-    console.error(erro);
+/**
+ * Algum puzzle de ontem jogado (tinta ou "Terminei") e ainda sem avaliação:
+ * mostra um lembrete discreto. O nível aberto tem preferência.
+ */
+async function lembrarOntem(ontem, nivelAberto, irPara) {
+  const ordem = [nivelAberto, ...NIVEIS.filter(n => n !== nivelAberto)];
+  for (const nivel of ordem) {
+    try {
+      const [registro, tracos] = await Promise.all([carregarRegistro(ontem, nivel), carregarTinta(ontem, nivel)]);
+      if (registro && registro.avaliacao) continue;
+      if (!(registro && registro.terminei) && tracos.length === 0) continue;
+      const faixa = $('lembrete-ontem');
+      faixa.textContent = `Gabarito de ontem (${NOMES_NIVEIS[nivel]}) disponível · toque para avaliar`;
+      faixa.hidden = false;
+      faixa.onclick = () => irPara(ontem, nivel);
+      return;
+    } catch (erro) {
+      console.error(erro);
+      return;
+    }
   }
+}
+
+/** Nível a abrir: ?nivel=, senão o último usado, senão "media". */
+function nivelInicial() {
+  const pedido = parametros.get('nivel');
+  if (nivelValido(pedido)) return pedido;
+  const salvo = lerPreferencia('nivel', 'media');
+  return nivelValido(salvo) ? salvo : 'media';
 }
 
 // ---------- Início ----------
@@ -345,6 +373,8 @@ async function iniciar() {
   // ?data=AAAA-MM-DD abre um dia específico (útil para testar).
   const pedida = parametros.get('data');
   const data = dataValida(pedida) ? pedida : hoje();
+  const nivel = nivelInicial();
+  gravarPreferencia('nivel', nivel);
 
   // "domingo, 15 de novembro" + " de 2026" (o ano some em telas estreitas, para caber).
   const extenso = dataPorExtenso(data);
@@ -355,18 +385,29 @@ async function iniciar() {
   $('data-extenso').replaceChildren(extenso.slice(0, corte), ano);
   $('data-extenso').title = extenso;
 
-  try {
-    const { datas } = await buscarJSON('puzzles/index.json');
-    if (!datas || datas.length === 0) throw new Error('puzzles/index.json está vazio');
+  // Seletor de nível: marca o aberto; trocar grava a tinta e abre o mesmo dia no outro nível.
+  let irPara = (destino, destinoNivel = nivel) => location.assign(endereco(destino, destinoNivel));
+  for (const botao of document.querySelectorAll('[data-nivel]')) {
+    botao.setAttribute('aria-pressed', String(botao.dataset.nivel === nivel));
+    botao.addEventListener('click', () => {
+      if (botao.dataset.nivel !== nivel) irPara(data, botao.dataset.nivel);
+    });
+  }
 
-    const { arquivo, substituto } = escolherPuzzle(data, datas);
+  try {
+    const { datas: indice } = await buscarJSON('puzzles/index.json');
+    if (!indice || Array.isArray(indice) || Object.keys(indice).length === 0) {
+      throw new Error('puzzles/index.json está vazio ou no formato antigo');
+    }
+
+    const { arquivo, dataDoArquivo, substituto } = escolherPuzzle(data, nivel, indice);
     const puzzle = await buscarJSON(`puzzles/${arquivo}.json`);
 
     $('edicao').textContent = `Nº ${puzzle.id} · ${puzzle.titulo}`;
+    $('edicao').title = `Nº ${puzzle.id} · ${puzzle.titulo}`;
     if (substituto) {
-      const aviso = $('aviso');
-      aviso.textContent = `Sem puzzle novo para ${data === hoje() ? "hoje" : "este dia"}, mostrando o de ${dataCurta(arquivo)}. O banco precisa de puzzles novos.`;
-      aviso.hidden = false;
+      mostrarAviso(`Sem cruzada ${NOMES_NIVEIS[nivel].toLowerCase()} nova para ${data === hoje() ? 'hoje' : 'este dia'}, ` +
+        `mostrando a de ${dataCurta(dataDoArquivo)}. O banco precisa de puzzles novos.`);
     }
 
     renderizarGrade($('grade'), puzzle);
@@ -376,11 +417,11 @@ async function iniciar() {
     // Girar a tela ou redimensionar a janela: recalcula o tamanho das casas.
     new ResizeObserver(() => requestAnimationFrame(ajustar)).observe($('folha'));
 
-    // Tinta salva desta data (antes de liberar a caneta, para nada ser sobrescrito).
+    // Tinta salva deste puzzle (antes de liberar a caneta, para nada ser sobrescrito).
     let salvos = [];
     let leuTinta = true;
     try {
-      salvos = await carregarTinta(data);
+      salvos = await carregarTinta(data, nivel);
     } catch (erro) {
       console.error(erro);
       leuTinta = false;
@@ -406,25 +447,26 @@ async function iniciar() {
     });
     tinta.importar(salvos);
     // Se não deu para ler a tinta guardada, não grava por cima dela (perderia o que já estava lá).
-    salvar = leuTinta ? criarSalvador(data, tinta) : async () => {};
+    salvar = leuTinta ? criarSalvador(data, nivel, tinta) : async () => {};
     salvarAntesDeSair = () => salvar();
     configurarFerramentas(tinta);
-    precarregarProximos(hojeEmBrasilia(), datas);
+    precarregarProximos(hojeEmBrasilia(), indice);
 
-    // Trocar de dia (Ontem / Hoje / lembrete): grava a tinta antes de sair.
-    const irPara = async destino => {
+    // Trocar de dia ou de nível (Ontem / Hoje / lembrete / seletor): grava a tinta antes de sair.
+    irPara = async (destino, destinoNivel = nivel) => {
       await salvar();
-      location.assign(endereco(destino));
+      location.assign(endereco(destino, destinoNivel));
     };
-    configurarDia({ data, arquivo, irPara });
+    configurarDia({ data, nivel, arquivo, irPara: (d, n) => irPara(d, n) });
 
-    // Painel "Meu histórico" (estatísticas, calendário, backup).
+    // Painel "Meu histórico" (estatísticas, calendário, backup), aberto no nível atual.
     iniciarHistorico({
       hoje,
+      nivel,
       antesDeLer: () => salvar(),
-      irPara,
+      irPara: (d, n) => irPara(d, n),
       aoImportar: async gravarBackup => {
-        // Para de salvar a tinta aberta, senão ela gravaria por cima do dia importado.
+        // Para de salvar a tinta aberta, senão ela gravaria por cima do puzzle importado.
         await salvar();
         const salvarAnterior = salvar;
         salvar = async () => {};
@@ -447,7 +489,7 @@ async function iniciar() {
     if (!dataValida(pedida)) {
       vigiarVirada(data, async () => {
         await salvar();
-        location.replace(location.pathname);
+        location.replace(endereco(hoje(), nivel));
       });
     }
   } catch (erro) {

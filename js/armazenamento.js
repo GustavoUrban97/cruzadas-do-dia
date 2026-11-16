@@ -1,22 +1,37 @@
-// Persistência local no IndexedDB, uma entrada por data (AAAA-MM-DD):
-//  - tinta:    os traços do dia;
-//  - registro: o que aconteceu no dia (terminei, avaliação do gabarito).
+// Persistência local no IndexedDB, uma entrada por puzzle (data + nível):
+//  - tinta:    os traços;
+//  - registro: o que aconteceu (terminei, avaliação do gabarito).
+// Chave das duas lojas: [data, nivel], ex.: ['2026-11-20', 'facil'].
 // Se o armazenamento falhar, o app continua funcionando (só não guarda),
 // e quem chama recebe o erro para avisar o usuário.
 
 const BANCO = 'cruzadas-do-dia';
-const VERSAO_BANCO = 2;          // 1: tinta · 2: + registro
-const LOJA_TINTA = 'tinta';       // { data, tracos: [...], atualizado }
-const LOJA_REGISTRO = 'registro'; // { data, puzzle, terminei, termineiEm, avaliacao, avaliadoEm }
-
-/** Avaliações possíveis do dia, na ordem dos botões. */
-export const AVALIACOES = {
-  'acertei-tudo': 'Acertei tudo',
-  'errei-algumas': 'Errei algumas',
-  'nao-terminei': 'Não terminei',
-};
+const VERSAO_BANCO = 3;          // 1: tinta · 2: + registro · 3: chave com nível
+const CHAVE = ['data', 'nivel'];
+const NIVEL_ANTIGO = 'media';     // o que foi salvo antes dos três níveis vira "Média"
+const LOJA_TINTA = 'tinta';       // { data, nivel, tracos: [...], atualizado }
+const LOJA_REGISTRO = 'registro'; // { data, nivel, puzzle, terminei, termineiEm, avaliacao, avaliadoEm }
 
 let bancoAberto = null;
+
+/**
+ * Cria a loja com a chave [data, nivel]. Se ela já existe com a chave antiga
+ * (só a data), copia tudo para a loja nova marcando o nível "media".
+ */
+function prepararLoja(banco, transacaoDeAtualizacao, nome) {
+  if (!banco.objectStoreNames.contains(nome)) {
+    banco.createObjectStore(nome, { keyPath: CHAVE });
+    return;
+  }
+  const antiga = transacaoDeAtualizacao.objectStore(nome);
+  if (Array.isArray(antiga.keyPath)) return; // já está no formato novo
+  const leitura = antiga.getAll();
+  leitura.onsuccess = () => {
+    banco.deleteObjectStore(nome);
+    const nova = banco.createObjectStore(nome, { keyPath: CHAVE });
+    for (const item of leitura.result) nova.put({ ...item, nivel: item.nivel || NIVEL_ANTIGO });
+  };
+}
 
 function abrir() {
   if (bancoAberto) return bancoAberto;
@@ -28,12 +43,9 @@ function abrir() {
       rejeitar(erro);
       return;
     }
-    // Cria só o que falta: a tinta já salva na versão 1 continua lá.
+    // Cria o que falta e migra o que já existe (nada salvo se perde).
     pedido.onupgradeneeded = () => {
-      const banco = pedido.result;
-      for (const loja of [LOJA_TINTA, LOJA_REGISTRO]) {
-        if (!banco.objectStoreNames.contains(loja)) banco.createObjectStore(loja, { keyPath: 'data' });
-      }
+      for (const loja of [LOJA_TINTA, LOJA_REGISTRO]) prepararLoja(pedido.result, pedido.transaction, loja);
     };
     pedido.onsuccess = () => {
       const banco = pedido.result;
@@ -45,7 +57,7 @@ function abrir() {
     // Outra aba com a versão antiga aberta segura a atualização do banco (às vezes sem
     // nem disparar "blocked"). Se não abrir em alguns segundos, desiste para a página
     // não travar; quem chama avisa e não grava por cima de nada.
-    setTimeout(() => rejeitar(new Error('IndexedDB bloqueado por outra aba do Cruzadas aberta')), 5000);
+    setTimeout(() => rejeitar(new Error('IndexedDB bloqueado por outra aba do Cruzadas aberta')), 8000);
   });
   bancoAberto.catch(() => { bancoAberto = null; }); // permite tentar de novo depois
   return bancoAberto;
@@ -63,31 +75,35 @@ function transacao(nomeLoja, modo, operacao) {
 
 // ---------- Tinta ----------
 
-/** Traços salvos para a data, ou [] se ainda não houver nada. */
-export async function carregarTinta(data) {
-  const salvo = await transacao(LOJA_TINTA, 'readonly', loja => loja.get(data));
+/** Traços salvos para o puzzle (data + nível), ou [] se ainda não houver nada. */
+export async function carregarTinta(data, nivel) {
+  const salvo = await transacao(LOJA_TINTA, 'readonly', loja => loja.get([data, nivel]));
   return salvo ? salvo.tracos : [];
 }
 
-/** Grava (substitui) os traços da data. */
-export function salvarTinta(data, tracos) {
-  return transacao(LOJA_TINTA, 'readwrite', loja => loja.put({ data, tracos, atualizado: new Date().toISOString() }));
+/** Grava (substitui) os traços do puzzle. */
+export function salvarTinta(data, nivel, tracos) {
+  return transacao(LOJA_TINTA, 'readwrite', loja =>
+    loja.put({ data, nivel, tracos, atualizado: new Date().toISOString() }));
 }
 
-// ---------- Registro do dia ----------
+// ---------- Registro ----------
 
-/** Registro da data, ou null se nada foi marcado. */
-export async function carregarRegistro(data) {
-  return (await transacao(LOJA_REGISTRO, 'readonly', loja => loja.get(data))) || null;
+/** Registro do puzzle, ou null se nada foi marcado. */
+export async function carregarRegistro(data, nivel) {
+  return (await transacao(LOJA_REGISTRO, 'readonly', loja => loja.get([data, nivel]))) || null;
 }
 
-/** Junta `mudancas` ao registro da data (lê e grava na mesma transação). Devolve o registro novo. */
-export function atualizarRegistro(data, mudancas) {
+/** Junta `mudancas` ao registro do puzzle (lê e grava na mesma transação). Devolve o registro novo. */
+export function atualizarRegistro(data, nivel, mudancas) {
   let novo;
   return transacao(LOJA_REGISTRO, 'readwrite', loja => {
-    const leitura = loja.get(data);
+    const leitura = loja.get([data, nivel]);
     leitura.onsuccess = () => {
-      novo = { data, terminei: false, termineiEm: null, avaliacao: null, avaliadoEm: null, ...leitura.result, ...mudancas };
+      novo = {
+        data, nivel, terminei: false, termineiEm: null, avaliacao: null, avaliadoEm: null,
+        ...leitura.result, ...mudancas,
+      };
       loja.put(novo);
     };
     return null;
@@ -110,7 +126,7 @@ export function lerTudo() {
 
 /**
  * Grava as entradas de um backup numa transação só (ou entra tudo, ou nada).
- * Cada data do backup substitui a mesma data deste aparelho; as outras ficam.
+ * Cada puzzle (data + nível) do backup substitui o mesmo puzzle deste aparelho; os outros ficam.
  */
 export function gravarBackup({ tinta, registro }) {
   return abrir().then(banco => new Promise((resolver, rejeitar) => {
