@@ -260,8 +260,16 @@ export function tracosPorCasa(tracos, puzzle, proporcao = 1) {
 // Limites (ajustados com a página de teste tools/reconhecer.html).
 export const LIMITES = {
   certa: 0.2,      // a letra esperada com pelo menos essa probabilidade: certa
+  certaParecida: 0.1, // idem, quando a lida é uma das PARECIDAS da esperada
   errada: 0.7,     // outra letra com essa certeza...
   esperadaMax: 0.05, // ...e a esperada abaixo disso: errada
+};
+
+// Letras que um traço meio torto da esperada vira com facilidade. Lida uma
+// dessas no lugar da esperada, a casa fica no máximo ilegível, nunca errada
+// (o O que não fechou em cima vira U ou J; aberto do lado, C).
+const PARECIDAS = {
+  O: 'UCJDGQ',
 };
 
 /**
@@ -275,8 +283,10 @@ export function conferirLetra(modelo, probs, esperada) {
   const iEsperada = classes.indexOf(esperada);
   const pEsperada = iEsperada >= 0 ? probs[iEsperada] : 0;
   let resultado = 'ilegivel';
+  const parecida = (PARECIDAS[esperada] || '').includes(classes[iTopo]);
   if (iTopo === iEsperada || pEsperada >= LIMITES.certa) resultado = 'certa';
-  else if (pTopo >= LIMITES.errada && pEsperada < LIMITES.esperadaMax) resultado = 'errada';
+  else if (parecida && pEsperada >= LIMITES.certaParecida) resultado = 'certa';
+  else if (pTopo >= LIMITES.errada && pEsperada < LIMITES.esperadaMax && !parecida) resultado = 'errada';
   return {
     resultado,
     lida: classes[iTopo],

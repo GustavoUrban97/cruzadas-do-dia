@@ -199,7 +199,7 @@ Fora do app (não entram no service worker):
 8. **Conteúdo:** gerador em `tools/gerador.html` (o Python ficou só no validador) e um banco inicial de 30 dias × 3 níveis, em 3 lotes de 10 dias.
 9. **Modo teclado:** ferramenta Teclado, teclado próprio estilo Termo, faixa da dica atual, letras salvas com a tinta, conferência das letras digitadas no gabarito, backup formato 3. ✔
 10. **Celular:** layout para tela estreita (S24) só com o modo teclado, cabeçalho compacto, ◀ ▶ na faixa da dica. ✔
-11. **Conferir a caneta:** modelo de letras treinado no EMNIST Letters (GitHub Actions, rede pequena, ~94,7% no teste, 266 KB em float16, no cache offline), `js/reconhecer.js` (traços da casa → imagem 28×28 como o EMNIST → rede em JS puro; certa / errada / ilegível sabendo a letra esperada), página de teste `tools/reconhecer.html` e `js/conferencia.js` (leitura em segundo plano, botão Conferir, marcas, Desistir, registro automático). ✔
+11. **Conferir a caneta:** modelo de letras treinado no EMNIST Letters (GitHub Actions, rede pequena, ~94,5% no teste, 266 KB em float16, no cache offline; o treino abre parte dos O e falha o traço de vez em quando, porque O sem fechar em cima virava U), `js/reconhecer.js` (traços da casa → imagem 28×28 como o EMNIST → rede em JS puro; certa / errada / ilegível sabendo a letra esperada; letras parecidas com a esperada, como U, C ou J no lugar de O, nunca contam como erradas), página de teste `tools/reconhecer.html` e `js/conferencia.js` (leitura em segundo plano, botão Conferir, marcas, Desistir, registro automático). ✔
 
 ## Critérios de aceite
 

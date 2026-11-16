@@ -8,8 +8,8 @@
   28
  ],
  "classes": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
- "precisao_teste": 0.9465,
- "precisao_teste_top3": 0.9951,
+ "precisao_teste": 0.9453,
+ "precisao_teste_top3": 0.995,
  "camadas": [
   {
    "tipo": "conv",
