@@ -49,7 +49,9 @@ puzzles/
   2026-11-07-dificil.json
 tools/
   validar.py
-  gerar_grade.py
+  proibidas.txt    # palavras que o gerador nunca usa
+  gerador.html     # gerador de cruzadas (roda no navegador)
+  gerador/         # módulos do gerador (esqueleto, palavras, perfis, worker)
 .github/workflows/validar.yml
 ```
 
@@ -147,11 +149,11 @@ Como no jornal, sem ajuda durante o dia:
 
 ## Conteúdo: pasta `tools/`
 
-Scripts Python, fora do app:
+Fora do app (não entram no service worker):
 
 1. `validar.py` — lê todos os JSON de `puzzles/` e falha se: grade diferente de 13×17; caractere inválido; dica fora de casa `#` ou apontando para casa que não é letra; mais de 2 dicas na mesma casa; palavra da grade (2+ letras) sem dica, ou com mais de uma; `resposta` não bate com a grade; palavra repetida no mesmo puzzle; `nivel` ausente ou inválido; nome do arquivo diferente de `data-nivel`; `id` repetido. Avisa (sem falhar) sobre dicas longas demais. Ao final, **regenera `puzzles/index.json`** no formato `{"datas": {"AAAA-MM-DD": ["facil", "media", "dificil"]}}`.
-2. `gerar_grade.py` — sorteia um esqueleto 13×17 diferente a cada puzzle (bordas e miolo; toda palavra com seta para o seu início, toda casa de dica com ao menos uma dica) e preenche com palavras em português (lista de frequência, por exemplo o pacote `wordfreq`, removendo acentos, filtrada por dicionário e por uma lista de palavras proibidas: estrangeirismos, siglas, nomes próprios, palavrões; por nível: fácil só com palavras comuns e palavras de até 6 letras, difícil com menos casas de dica e palavras menos usuais, mas palavras de 2–3 letras sempre das mais comuns), sem repetir palavras, atribui cada palavra a uma casa de dica vizinha (no máximo 2 por casa) e gera o JSON com os textos das dicas em branco para eu (ou uma IA) escrever.
-3. Dicas escritas em lotes (um mês por vez) e revisadas por mim. Não copiar puzzles de revistas, jornais ou apps.
+2. `gerador.html` — página em JavaScript (sem build) que roda no navegador com o servidor local (`http://localhost:8000/tools/gerador.html`). Gera um lote (dias × níveis) em Web Workers. Sorteia um esqueleto 13×17 diferente a cada puzzle (bordas e miolo; toda palavra com seta para o seu início, toda casa de dica com ao menos uma dica) e preenche com palavras em português (lista de frequência FrequencyWords pt_br_50k filtrada pelo dicionário pythonprobr/palavras, ambas baixadas por URL e fora do repositório por causa das licenças; sem acentos; sem as palavras de `tools/proibidas.txt`: estrangeirismos, siglas, nomes próprios, palavrões; por nível: fácil só com palavras comuns e palavras de até 6 letras, difícil com menos casas de dica e palavras menos usuais, mas palavras de 2–3 letras sempre das mais comuns). Sem repetir palavras no puzzle, nem palavras de 5+ letras num intervalo de 30 dias. Atribui cada palavra a uma casa de dica vizinha (no máximo 2 por casa), aplica os textos das dicas colados em JSON (`{"facil": {"PALAVRA": "texto"}}`, por nível ou por arquivo) e salva os arquivos e o `index.json` na pasta `puzzles/` ("Salvar na pasta…", Chrome/Edge no PC). Títulos pelo dia da semana: "Terça tranquila", "Terça-feira", "Terça de mestre".
+3. Dicas escritas em lotes (lotes de 10 dias) e revisadas por mim. Não copiar puzzles de revistas, jornais ou apps.
 
 ## GitHub Pages e CI
 
@@ -169,7 +171,7 @@ Scripts Python, fora do app:
 5. **Conferência:** botão "Terminei", gabarito de ontem em verde, avaliação do dia (acertei tudo / errei algumas / não terminei), registro do dia no IndexedDB. ✔
 6. **Histórico, estatísticas e backup:** calendário, sequência, estatísticas estilo Termo, exportar/importar. ✔
 7. **Cabeçalho em duas barras e três níveis:** seletor Fácil/Média/Difícil, tinta e registro por nível (migração do que já existia para "Média"), histórico com abas por nível, backup formato 2, um puzzle de exemplo de cada nível. ✔
-8. **Conteúdo:** `gerar_grade.py` (com opção de nível) e um banco inicial de 30 dias × 3 níveis.
+8. **Conteúdo:** gerador em `tools/gerador.html` (o Python ficou só no validador) e um banco inicial de 30 dias × 3 níveis, em 3 lotes de 10 dias.
 
 ## Critérios de aceite
 

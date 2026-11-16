@@ -14,7 +14,17 @@ python3 -m http.server 8000
 
 Abra `http://localhost:8000`. Para abrir um dia específico: `http://localhost:8000/?data=2026-11-07`.
 
-## Adicionar puzzles
+## Gerar puzzles
+
+Com o servidor local rodando, abra `http://localhost:8000/tools/gerador.html` (Chrome ou Edge no PC):
+
+1. Escolha o primeiro dia (já vem o dia seguinte ao último publicado), quantos dias e os níveis, e toque em **Gerar**. Cada cruzada sai com um esqueleto próprio e as dicas em branco.
+2. Toque em **Copiar lista de palavras**, escreva as dicas (à mão ou com uma IA) num JSON `{"facil": {"PALAVRA": "texto"}, ...}`, cole no campo e toque em **Aplicar dicas**.
+3. **Salvar na pasta puzzles…** grava os arquivos e o `index.json`. Depois é só validar e fazer commit.
+
+Palavra ruim num puzzle gerado? Acrescente em `tools/proibidas.txt` e gere de novo.
+
+## Adicionar puzzles à mão
 
 1. Cada dia tem três cruzadas, uma por nível: crie `puzzles/AAAA-MM-DD-facil.json`, `-media.json` e `-dificil.json` seguindo o formato de `puzzles/2026-11-07-media.json` (com o campo `"nivel"`): grade 13×17, `#` = casa de dica, letras maiúsculas sem acento. Cada dica diz em que casa fica (`linha`, `coluna`) e a direção da seta (`direita`, `baixo`, `baixo-direita` ou `direita-baixo`); no máximo 2 dicas por casa. Detalhes no `CLAUDE.md`.
 2. Rode `python3 tools/validar.py`. Ele confere se toda palavra tem dica, se as setas e respostas batem com a grade e regenera `puzzles/index.json`.
