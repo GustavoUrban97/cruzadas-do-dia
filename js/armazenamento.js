@@ -1,10 +1,20 @@
-// Persistência local da tinta no IndexedDB: um registro por data (AAAA-MM-DD).
-// Tudo com try/catch: se o armazenamento falhar, o app continua funcionando
-// (só não guarda), e quem chama recebe o erro para avisar o usuário.
+// Persistência local no IndexedDB, uma entrada por data (AAAA-MM-DD):
+//  - tinta:    os traços do dia;
+//  - registro: o que aconteceu no dia (terminei, avaliação do gabarito).
+// Se o armazenamento falhar, o app continua funcionando (só não guarda),
+// e quem chama recebe o erro para avisar o usuário.
 
 const BANCO = 'cruzadas-do-dia';
-const VERSAO_BANCO = 1;
-const LOJA_TINTA = 'tinta'; // { data, tracos: [{ ferramenta, pontos }], atualizado }
+const VERSAO_BANCO = 2;          // 1: tinta · 2: + registro
+const LOJA_TINTA = 'tinta';       // { data, tracos: [...], atualizado }
+const LOJA_REGISTRO = 'registro'; // { data, puzzle, terminei, termineiEm, avaliacao, avaliadoEm }
+
+/** Avaliações possíveis do dia, na ordem dos botões. */
+export const AVALIACOES = {
+  'acertei-tudo': 'Acertei tudo',
+  'errei-algumas': 'Errei algumas',
+  'nao-terminei': 'Não terminei',
+};
 
 let bancoAberto = null;
 
@@ -18,39 +28,70 @@ function abrir() {
       rejeitar(erro);
       return;
     }
+    // Cria só o que falta: a tinta já salva na versão 1 continua lá.
     pedido.onupgradeneeded = () => {
       const banco = pedido.result;
-      if (!banco.objectStoreNames.contains(LOJA_TINTA)) {
-        banco.createObjectStore(LOJA_TINTA, { keyPath: 'data' });
+      for (const loja of [LOJA_TINTA, LOJA_REGISTRO]) {
+        if (!banco.objectStoreNames.contains(loja)) banco.createObjectStore(loja, { keyPath: 'data' });
       }
     };
-    pedido.onsuccess = () => resolver(pedido.result);
+    pedido.onsuccess = () => {
+      const banco = pedido.result;
+      // Outra aba abriu uma versão mais nova do banco: fecha esta conexão para não travá-la.
+      banco.onversionchange = () => { banco.close(); bancoAberto = null; };
+      resolver(banco);
+    };
     pedido.onerror = () => rejeitar(pedido.error);
-    pedido.onblocked = () => rejeitar(new Error('IndexedDB bloqueado por outra aba'));
+    // Outra aba com a versão antiga aberta segura a atualização do banco (às vezes sem
+    // nem disparar "blocked"). Se não abrir em alguns segundos, desiste para a página
+    // não travar; quem chama avisa e não grava por cima de nada.
+    setTimeout(() => rejeitar(new Error('IndexedDB bloqueado por outra aba do Cruzadas aberta')), 5000);
   });
   bancoAberto.catch(() => { bancoAberto = null; }); // permite tentar de novo depois
   return bancoAberto;
 }
 
-function transacao(modo, operacao) {
+function transacao(nomeLoja, modo, operacao) {
   return abrir().then(banco => new Promise((resolver, rejeitar) => {
-    const tx = banco.transaction(LOJA_TINTA, modo);
-    const pedido = operacao(tx.objectStore(LOJA_TINTA));
+    const tx = banco.transaction(nomeLoja, modo);
+    const pedido = operacao(tx.objectStore(nomeLoja));
     tx.oncomplete = () => resolver(pedido ? pedido.result : undefined);
     tx.onerror = () => rejeitar(tx.error);
     tx.onabort = () => rejeitar(tx.error || new Error('transação abortada'));
   }));
 }
 
+// ---------- Tinta ----------
+
 /** Traços salvos para a data, ou [] se ainda não houver nada. */
 export async function carregarTinta(data) {
-  const registro = await transacao('readonly', loja => loja.get(data));
-  return registro ? registro.tracos : [];
+  const salvo = await transacao(LOJA_TINTA, 'readonly', loja => loja.get(data));
+  return salvo ? salvo.tracos : [];
 }
 
 /** Grava (substitui) os traços da data. */
 export function salvarTinta(data, tracos) {
-  return transacao('readwrite', loja => loja.put({ data, tracos, atualizado: new Date().toISOString() }));
+  return transacao(LOJA_TINTA, 'readwrite', loja => loja.put({ data, tracos, atualizado: new Date().toISOString() }));
+}
+
+// ---------- Registro do dia ----------
+
+/** Registro da data, ou null se nada foi marcado. */
+export async function carregarRegistro(data) {
+  return (await transacao(LOJA_REGISTRO, 'readonly', loja => loja.get(data))) || null;
+}
+
+/** Junta `mudancas` ao registro da data (lê e grava na mesma transação). Devolve o registro novo. */
+export function atualizarRegistro(data, mudancas) {
+  let novo;
+  return transacao(LOJA_REGISTRO, 'readwrite', loja => {
+    const leitura = loja.get(data);
+    leitura.onsuccess = () => {
+      novo = { data, terminei: false, termineiEm: null, avaliacao: null, avaliadoEm: null, ...leitura.result, ...mudancas };
+      loja.put(novo);
+    };
+    return null;
+  }).then(() => novo);
 }
 
 /**

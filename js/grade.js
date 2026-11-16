@@ -126,3 +126,19 @@ function encaixarTextos(elemento) {
     if (naoCabe(texto)) texto.classList.add('apertada');
   }
 }
+
+/**
+ * Coloca as respostas (letras do campo `grade`) em cada casa de letra, para o
+ * gabarito de dias passados. Ficam por baixo da tinta; a visibilidade é
+ * controlada pela classe `com-gabarito` na grade.
+ */
+export function colocarGabarito(elemento, puzzle) {
+  for (const casa of elemento.querySelectorAll('.casa.letra')) {
+    const letra = puzzle.grade[casa.dataset.linha][casa.dataset.coluna];
+    const span = document.createElement('span');
+    span.className = 'letra-gabarito';
+    span.setAttribute('aria-hidden', 'true');
+    span.textContent = letra;
+    casa.prepend(span);
+  }
+}

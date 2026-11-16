@@ -61,6 +61,7 @@ Usar **Pointer Events** (`pointerType`):
 | `mouse` | Desenha (só para desenvolver no PC); botão direito apaga |
 
 - Tela de diagnóstico `?debug=1` mostra os eventos de ponteiro recebidos (tipo, `button`, `buttons`, pressão, tamanho).
+- `?hoje=AAAA-MM-DD` finge que hoje é outra data (testar o fluxo de "ontem" sem esperar a meia-noite).
 - Latência: `touch-action: none` na área de desenho, `getCoalescedEvents()` para traço suave, `requestAnimationFrame`, e só o trecho novo do traço é desenhado a cada quadro.
 - **Não usar `desynchronized: true`** nas camadas de tinta: no Tab S9 a parte transparente do canvas fica preta e cobre a grade. Fica atrás de `?baixalatencia=1` só para experimentos.
 - **Sem previsão de pontos** (`getPredictedEvents`) por padrão: o "traço futuro" ficou perceptível no Tab S9. `?previsao=1` liga para comparar.
@@ -98,8 +99,8 @@ Usar **Pointer Events** (`pointerType`):
 
 Como no jornal, sem ajuda durante o dia:
 
-- **Hoje:** só a folha. Um botão discreto **"Terminei"** registra que concluí naquele dia (opcional).
-- **Gabarito de ontem:** mostra a grade de ontem com a minha tinta e as respostas sobrepostas **em verde, levemente transparente** (verde para não confundir com nenhuma das cores de caneta). Ali eu avalio o dia: **Acertei tudo**, **Errei algumas** ou **Não terminei**.
+- **Hoje:** só a folha. Um botão discreto **"Terminei"** registra que concluí naquele dia (opcional); tocar de novo desfaz. Botão "Ontem" abre o gabarito de ontem, e um lembrete aparece se ontem foi jogado e ainda não avaliado.
+- **Gabarito de ontem:** mostra a grade de ontem com a minha tinta e as respostas sobrepostas **em verde, levemente transparente** (verde para não confundir com nenhuma das cores de caneta). Ali eu avalio o dia: **Acertei tudo**, **Errei algumas** ou **Não terminei** (pode trocar depois). As letras verdes ficam por baixo da tinta e podem ser ocultadas. Qualquer dia passado abre assim; dia futuro nunca mostra respostas.
 - Dia em que nem abri a página: **não jogou**.
 - **Sequência:** dias seguidos em que **terminei** o puzzle (acertando tudo ou errando algumas). "Não terminei" e "não jogou" quebram a sequência.
 - **Estatísticas** no estilo do Termo: dias jogados, % de "acertei tudo", sequência atual e melhor sequência, distribuição entre acertei tudo / errei algumas / não terminei.
@@ -156,8 +157,8 @@ Scripts Python, fora do app:
 1. **Esqueleto:** estrutura de pastas, `index.html`, leitura do puzzle de exemplo, grade no formato direta (sem tinta), cálculo de "hoje" em Brasília. `tools/validar.py` e o workflow. ✔
 2. **Tinta:** desenho com caneta, rejeição de palma, borracha (ferramenta e botão), lápis, desfazer/refazer, pressão, tela de diagnóstico `?debug=1`. ✔
 3. **Persistência e ciclo diário:** IndexedDB por data, virada da meia-noite, fallback de puzzle, proteção do gesto de voltar. ✔
-4. **Cores e offline:** caneta preta/azul/vermelha, service worker (offline + aviso de atualização). Sem manifesto/instalação.
-5. **Conferência:** botão "Terminei", gabarito de ontem em verde, avaliação do dia (acertei tudo / errei algumas / não terminei).
+4. **Cores e offline:** caneta preta/azul/vermelha, service worker (offline + aviso de atualização). Sem manifesto/instalação. ✔
+5. **Conferência:** botão "Terminei", gabarito de ontem em verde, avaliação do dia (acertei tudo / errei algumas / não terminei), registro do dia no IndexedDB. ✔
 6. **Histórico, estatísticas e backup:** calendário, sequência, estatísticas estilo Termo, exportar/importar.
 7. **Conteúdo:** `gerar_grade.py` e um banco inicial de 30 puzzles.
 

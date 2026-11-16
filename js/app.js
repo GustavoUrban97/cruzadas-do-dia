@@ -1,18 +1,30 @@
 // Inicialização e escolha do puzzle por data.
 
 import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre, somarDias } from './datas.js';
-import { renderizarGrade, ajustarTamanho } from './grade.js';
+import { renderizarGrade, ajustarTamanho, colocarGabarito } from './grade.js';
 import { Tinta } from './tinta.js';
 import { iniciarDiagnostico } from './diagnostico.js';
-import { carregarTinta, salvarTinta, pedirPersistencia } from './armazenamento.js';
+import { carregarTinta, salvarTinta, pedirPersistencia, carregarRegistro, atualizarRegistro } from './armazenamento.js';
 
 // Versão do app, mostrada discretamente no cabeçalho.
 // IMPORTANTE: precisa ser igual à VERSAO de sw.js, que deve subir a cada mudança
 // em HTML/CSS/JS (é o que faz o tablet perceber que há versão nova).
-const VERSAO = 7;
+const VERSAO = 8;
 
 const $ = id => document.getElementById(id);
 const parametros = new URLSearchParams(location.search);
+
+// ?hoje=AAAA-MM-DD finge que hoje é outra data (só para testar o fluxo de "ontem").
+const HOJE_FINGIDO = dataValida(parametros.get('hoje')) ? parametros.get('hoje') : null;
+const hoje = () => HOJE_FINGIDO ?? hojeEmBrasilia();
+
+/** Endereço da página para uma data, mantendo ?hoje e ?debug. Hoje = sem ?data. */
+function endereco(data) {
+  const p = new URLSearchParams(location.search);
+  if (data === hoje()) p.delete('data'); else p.set('data', data);
+  const busca = p.toString();
+  return location.pathname + (busca ? `?${busca}` : '');
+}
 
 async function buscarJSON(caminho) {
   const resposta = await fetch(caminho, { cache: 'no-cache' });
@@ -150,7 +162,7 @@ function criarProtecaoVoltar() {
 /** Confere a data a cada minuto e ao voltar ao app; avisa, sem trocar à força. */
 function vigiarVirada(dataAberta, aoTrocar) {
   const conferir = () => {
-    if (hojeEmBrasilia() === dataAberta) return;
+    if (hoje() === dataAberta) return;
     const faixa = $('novo-puzzle');
     faixa.hidden = false;
     faixa.onclick = aoTrocar;
@@ -212,6 +224,113 @@ function precarregarProximos(hoje, datas) {
   }
 }
 
+// ---------- Registro do dia: Terminei, gabarito e avaliação ----------
+
+/**
+ * Mostra as ações que fazem sentido para a data aberta:
+ *  - hoje: "Terminei" (marca/desmarca) e "Ontem" (abre o gabarito de ontem);
+ *  - dia passado: gabarito em verde, avaliação do dia e "Hoje";
+ *  - dia futuro (só em teste): apenas "Hoje".
+ * Editar a tinta de um dia passado não mexe no registro.
+ */
+async function configurarDia({ data, arquivo, irPara }) {
+  const diaDeHoje = hoje();
+  const passado = data < diaDeHoje;
+
+  let registro = null;
+  try {
+    registro = await carregarRegistro(data);
+  } catch (erro) {
+    console.error(erro);
+  }
+
+  const gravar = async (mudancas, mensagem) => {
+    try {
+      registro = await atualizarRegistro(data, { puzzle: arquivo, ...mudancas });
+      if (mensagem) mostrarToast(mensagem);
+      return true;
+    } catch (erro) {
+      console.error(erro);
+      mostrarAviso('Atenção: não foi possível salvar o registro do dia neste aparelho.');
+      return false;
+    }
+  };
+
+  if (data !== diaDeHoje) {
+    const botao = $('ir-hoje');
+    botao.hidden = false;
+    botao.addEventListener('click', () => irPara(diaDeHoje));
+  }
+
+  if (data === diaDeHoje) {
+    // "Terminei": opcional; tocar de novo desfaz (caso tenha sido sem querer).
+    const terminei = $('terminei');
+    const pintar = () => {
+      const marcado = Boolean(registro && registro.terminei);
+      terminei.setAttribute('aria-pressed', String(marcado));
+      terminei.textContent = marcado ? '✓ Terminei' : 'Terminei';
+    };
+    pintar();
+    terminei.hidden = false;
+    terminei.addEventListener('click', async () => {
+      const marcar = !(registro && registro.terminei);
+      const ok = await gravar(
+        { terminei: marcar, termineiEm: marcar ? new Date().toISOString() : null },
+        marcar ? 'Registrado: terminei hoje. O gabarito sai amanhã.' : 'Registro de hoje desfeito.',
+      );
+      if (ok) pintar();
+    });
+
+    const ontem = somarDias(diaDeHoje, -1);
+    const botaoOntem = $('ir-ontem');
+    botaoOntem.hidden = false;
+    botaoOntem.addEventListener('click', () => irPara(ontem));
+    lembrarOntem(ontem, () => irPara(ontem));
+  }
+
+  if (passado) {
+    // Gabarito em verde, por baixo da tinta.
+    const grade = $('grade');
+    const alternar = $('alternar-gabarito');
+    const mostrar = visivel => {
+      grade.classList.toggle('com-gabarito', visivel);
+      alternar.textContent = visivel ? 'Ocultar gabarito' : 'Mostrar gabarito';
+      gravarPreferencia('gabarito', visivel ? 'mostrar' : 'ocultar');
+    };
+    mostrar(lerPreferencia('gabarito', 'mostrar') !== 'ocultar');
+    alternar.addEventListener('click', () => mostrar(!grade.classList.contains('com-gabarito')));
+
+    // Avaliação do dia: pode ser trocada depois, se tocou errado.
+    const opcoes = [...document.querySelectorAll('[data-avaliacao]')];
+    const pintar = () => opcoes.forEach(b =>
+      b.setAttribute('aria-pressed', String(Boolean(registro) && registro.avaliacao === b.dataset.avaliacao)));
+    pintar();
+    opcoes.forEach(b => b.addEventListener('click', async () => {
+      if (registro && registro.avaliacao === b.dataset.avaliacao) return;
+      const ok = await gravar(
+        { avaliacao: b.dataset.avaliacao, avaliadoEm: new Date().toISOString() },
+        `Registrado: ${b.textContent.toLowerCase()} em ${dataCurta(data)}.`,
+      );
+      if (ok) pintar();
+    }));
+    $('avaliacao').hidden = false;
+  }
+}
+
+/** Ontem jogado (tinta ou "Terminei") e ainda sem avaliação: mostra um lembrete discreto. */
+async function lembrarOntem(ontem, abrir) {
+  try {
+    const [registro, tracos] = await Promise.all([carregarRegistro(ontem), carregarTinta(ontem)]);
+    if (registro && registro.avaliacao) return;
+    if (!(registro && registro.terminei) && tracos.length === 0) return;
+    const faixa = $('lembrete-ontem');
+    faixa.hidden = false;
+    faixa.onclick = abrir;
+  } catch (erro) {
+    console.error(erro);
+  }
+}
+
 // ---------- Início ----------
 
 async function iniciar() {
@@ -224,9 +343,16 @@ async function iniciar() {
 
   // ?data=AAAA-MM-DD abre um dia específico (útil para testar).
   const pedida = parametros.get('data');
-  const data = dataValida(pedida) ? pedida : hojeEmBrasilia();
+  const data = dataValida(pedida) ? pedida : hoje();
 
-  $('data-extenso').textContent = dataPorExtenso(data);
+  // "domingo, 15 de novembro" + " de 2026" (o ano some em telas estreitas, para caber).
+  const extenso = dataPorExtenso(data);
+  const corte = extenso.lastIndexOf(' de ');
+  const ano = document.createElement('span');
+  ano.className = 'ano';
+  ano.textContent = extenso.slice(corte);
+  $('data-extenso').replaceChildren(extenso.slice(0, corte), ano);
+  $('data-extenso').title = extenso;
 
   try {
     const { datas } = await buscarJSON('puzzles/index.json');
@@ -238,11 +364,12 @@ async function iniciar() {
     $('edicao').textContent = `Nº ${puzzle.id} · ${puzzle.titulo}`;
     if (substituto) {
       const aviso = $('aviso');
-      aviso.textContent = `Sem puzzle novo para hoje, mostrando o de ${dataCurta(arquivo)}. O banco precisa de puzzles novos.`;
+      aviso.textContent = `Sem puzzle novo para ${data === hoje() ? "hoje" : "este dia"}, mostrando o de ${dataCurta(arquivo)}. O banco precisa de puzzles novos.`;
       aviso.hidden = false;
     }
 
     renderizarGrade($('grade'), puzzle);
+    if (data < hoje()) colocarGabarito($('grade'), puzzle); // como no jornal: só no dia seguinte
     const ajustar = () => ajustarTamanho($('grade'), $('folha'), puzzle);
     ajustar();
     // Girar a tela ou redimensionar a janela: recalcula o tamanho das casas.
@@ -250,11 +377,15 @@ async function iniciar() {
 
     // Tinta salva desta data (antes de liberar a caneta, para nada ser sobrescrito).
     let salvos = [];
+    let leuTinta = true;
     try {
       salvos = await carregarTinta(data);
     } catch (erro) {
       console.error(erro);
-      mostrarAviso('Atenção: não foi possível ler a tinta salva neste aparelho.');
+      leuTinta = false;
+      mostrarAviso(String(erro.message).includes('bloqueado')
+        ? 'Há outra aba do Cruzadas aberta com a versão antiga: feche-a e recarregue esta.'
+        : 'Atenção: não foi possível ler a tinta salva neste aparelho.');
     }
 
     const armarVoltar = criarProtecaoVoltar();
@@ -273,10 +404,18 @@ async function iniciar() {
       },
     });
     tinta.importar(salvos);
-    salvar = criarSalvador(data, tinta);
+    // Se não deu para ler a tinta guardada, não grava por cima dela (perderia o que já estava lá).
+    salvar = leuTinta ? criarSalvador(data, tinta) : async () => {};
     salvarAntesDeSair = () => salvar();
     configurarFerramentas(tinta);
     precarregarProximos(hojeEmBrasilia(), datas);
+
+    // Trocar de dia (Ontem / Hoje / lembrete): grava a tinta antes de sair.
+    const irPara = async destino => {
+      await salvar();
+      location.assign(endereco(destino));
+    };
+    configurarDia({ data, arquivo, irPara });
 
     // Ao sair do app (trocar de app, apagar a tela), garante a última gravação.
     document.addEventListener('visibilitychange', () => {

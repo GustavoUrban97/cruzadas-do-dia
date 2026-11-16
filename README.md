@@ -26,7 +26,8 @@ Abra https://gustavourban97.github.io/cruzadas-do-dia/ no Chrome. A tinta fica s
 
 - Quando aparecer **"Atualização disponível"**, toque para recarregar com a versão nova.
 - `?debug=1` no fim do endereço mostra os eventos da caneta (diagnóstico).
-- `?data=AAAA-MM-DD` abre um dia específico.
+- `?data=AAAA-MM-DD` abre um dia específico (dias passados mostram o gabarito).
+- `?hoje=AAAA-MM-DD` finge que hoje é outra data (para testar).
 
 ## Publicar uma versão nova
 
