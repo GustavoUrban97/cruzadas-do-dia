@@ -42,6 +42,7 @@ js/armazenamento.js# IndexedDB
 js/datas.js        # "hoje" em America/Sao_Paulo, formatação
 js/diagnostico.js  # tela ?debug=1
 js/historico.js    # painel "Meu histórico": estatísticas, calendário, backup
+js/reconhecer.js   # reconhecimento das letras à caneta (modelo em modelo/), para conferir
 js/niveis.js       # os três níveis (fácil, média, difícil)
 puzzles/
   index.json       # lista de datas disponíveis (gerado pelo validador)
@@ -53,7 +54,11 @@ tools/
   proibidas.txt    # palavras que o gerador nunca usa
   gerador.html     # gerador de cruzadas (roda no navegador)
   gerador/         # módulos do gerador (esqueleto, palavras, perfis, worker)
+  reconhecer.html  # teste do reconhecimento de letras (S Pen), fora do app
+  treino/treinar_letras.py  # treina o modelo de letras (roda no GitHub Actions)
+modelo/            # modelo de letras (letras.json + letras.bin, float16), gerado pelo treino
 .github/workflows/validar.yml
+.github/workflows/treinar-letras.yml   # treino do modelo (quando tools/treino muda ou à mão)
 ```
 
 ## Entrada (o ponto mais importante)
@@ -191,6 +196,7 @@ Fora do app (não entram no service worker):
 8. **Conteúdo:** gerador em `tools/gerador.html` (o Python ficou só no validador) e um banco inicial de 30 dias × 3 níveis, em 3 lotes de 10 dias.
 9. **Modo teclado:** ferramenta Teclado, teclado próprio estilo Termo, faixa da dica atual, letras salvas com a tinta, conferência das letras digitadas no gabarito, backup formato 3. ✔
 10. **Celular:** layout para tela estreita (S24) só com o modo teclado, cabeçalho compacto, ◀ ▶ na faixa da dica. ✔
+11. **Conferir a caneta (em andamento):** modelo de letras treinado no EMNIST Letters (GitHub Actions, rede pequena, ~94,7% no teste), `js/reconhecer.js` (traços da casa → imagem 28×28 como o EMNIST → rede em JS puro; certa / errada / ilegível sabendo a letra esperada; só caneta conta, lápis é rascunho) e a página de teste `tools/reconhecer.html`. Fase 2, se o teste no tablet for bom: o Terminei confere no dia (marca erradas e ilegíveis sem mostrar a resposta), estatísticas automáticas, gabarito só para quem desistiu — muda o princípio "não reconhece a escrita".
 
 ## Critérios de aceite
 
