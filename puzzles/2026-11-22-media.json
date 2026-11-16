@@ -25,6 +25,7 @@
     "#NA#CHA#MAGOA",
     "NOSSA#OS#SORO"
   ],
+  "banco": ["EMIR", "MAGOA", "PERUA", "SOLA"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Parte da peça", "resposta": "ATO"},
     {"linha": 0, "coluna": 2, "direcao": "direita-baixo", "texto": "Mulher exibida", "resposta": "PERUA"},

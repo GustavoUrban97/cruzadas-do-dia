@@ -25,6 +25,7 @@
     "#TEOR#ELO#ACO",
     "PA#LA#MES#LAS"
   ],
+  "banco": ["ETA", "PROL", "TIL"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Bolo ___ cenoura", "resposta": "DE"},
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Saara", "resposta": "DESERTO"},

@@ -25,6 +25,7 @@
     "#A#DAMA#ARABE",
     "IRMAS#SER#LEI"
   ],
+  "banco": ["ADAO", "ARABE", "LETAL", "RUM", "SUPOR"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Contrário de bem", "resposta": "MAL"},
     {"linha": 0, "coluna": 1, "direcao": "baixo", "texto": "Preposição de limite", "resposta": "ATE"},

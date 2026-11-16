@@ -25,6 +25,7 @@
     "#TEM#TER#ALTA",
     "SER#PARA#SEUS"
   ],
+  "banco": ["AMAS", "CHALE", "LAGOA", "OVAL"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Puxa vida!", "resposta": "CARAMBA"},
     {"linha": 0, "coluna": 1, "direcao": "direita-baixo", "texto": "Choque", "resposta": "TRAUMA"},

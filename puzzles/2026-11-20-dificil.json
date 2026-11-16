@@ -25,6 +25,7 @@
     "TOTAL#ATUACAO",
     "#LEOA#SE#SOIS"
   ],
+  "banco": ["ANU", "EROS", "PROL"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "baixo", "texto": "Família escocesa", "resposta": "CLA"},
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Molha a rua", "resposta": "CHOVE"},

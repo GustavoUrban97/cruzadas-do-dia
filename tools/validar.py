@@ -151,6 +151,19 @@ def validar_puzzle(caminho):
     if repetidas:
         erros.append(f"palavra repetida no puzzle: {', '.join(repetidas)}")
 
+    # banco (opcional): palavras de ajuda, todas precisam estar na grade
+    banco = puzzle.get("banco", [])
+    if not isinstance(banco, list) or not all(isinstance(p, str) for p in banco):
+        erros.append("banco deve ser uma lista de palavras")
+    else:
+        fora = [p for p in banco if p not in contagem]
+        if fora:
+            erros.append(f"banco tem palavra que não está na grade: {', '.join(fora)}")
+        if len(set(banco)) != len(banco):
+            erros.append("banco tem palavra repetida")
+        if len(banco) > 6:
+            avisos.append(f"banco com {len(banco)} palavras pode não caber embaixo da grade")
+
     return puzzle, erros, avisos
 
 

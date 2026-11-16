@@ -25,6 +25,7 @@
     "MAMAE#CRATERA",
     "#RESUMO#ZEROS"
   ],
+  "banco": ["OUSAR", "RONCA", "VODU", "ZEROS"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita", "texto": "A ele", "resposta": "LHE"},
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Distante", "resposta": "LONGE"},

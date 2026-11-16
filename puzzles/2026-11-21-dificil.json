@@ -25,6 +25,7 @@
     "NOVO#AR#NOBEL",
     "#SERAS#DURONA"
   ],
+  "banco": ["EROS", "MIMAR", "VISOR"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Mensagem na garrafa", "resposta": "SOS"},
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Cinza", "resposta": "PO"},

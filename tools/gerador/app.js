@@ -51,13 +51,36 @@ async function buscarTexto(url) {
 }
 
 /** Mesmo formato dos arquivos de puzzles/ (uma dica por linha). */
+// Banco: palavras de ajuda impressas de ponta-cabeça embaixo da grade.
+// Quantas por nível (o difícil ajuda menos).
+const BANCO_POR_NIVEL = { facil: 5, media: 4, dificil: 3 };
+
+/**
+ * Escolhe as palavras do banco: as mais raras do puzzle (pela posição na lista
+ * de frequência; fora da lista conta como raríssima), de preferência as de 3 a
+ * 5 letras, que são as que mais travam. Em ordem alfabética.
+ */
+export function escolherBanco(p, base = estado.base) {
+  const posicao = new Map((base || []).map((w, i) => [w, i]));
+  const rank = w => posicao.get(w) ?? Infinity;
+  const proibidas = estado.proibidas || new Set();
+  const respostas = [...new Set(p.dicas.map(d => d.resposta))].filter(w => w.length >= 3 && !proibidas.has(w));
+  const porRaridade = lista => lista.sort((a, b) => rank(b) - rank(a) || a.localeCompare(b));
+  const curtas = porRaridade(respostas.filter(w => w.length <= 5));
+  const longas = porRaridade(respostas.filter(w => w.length > 5));
+  return [...curtas, ...longas].slice(0, BANCO_POR_NIVEL[p.nivel] ?? 4).sort();
+}
+
 export function serializar(p) {
   const campo = d => '    ' + JSON.stringify(d).replace(/":/g, '": ').replace(/,"/g, ', "');
+  const banco = p.banco || (estado.base ? escolherBanco(p) : []);
   return '{\n' +
     `  "id": ${p.id},\n  "data": "${p.data}",\n  "nivel": "${p.nivel}",\n` +
     `  "titulo": ${JSON.stringify(p.titulo)},\n  "autor": ${JSON.stringify(p.autor)},\n` +
     '  "largura": 13,\n  "altura": 17,\n  "grade": [\n' +
-    p.grade.map(l => `    "${l}"`).join(',\n') + '\n  ],\n  "dicas": [\n' +
+    p.grade.map(l => `    "${l}"`).join(',\n') + '\n  ],\n' +
+    (banco.length ? `  "banco": ${JSON.stringify(banco).replace(/,/g, ', ')},\n` : '') +
+    '  "dicas": [\n' +
     p.dicas.map(d => campo({ linha: d.linha, coluna: d.coluna, direcao: d.direcao, texto: d.texto, resposta: d.resposta })).join(',\n') +
     '\n  ]\n}\n';
 }
@@ -363,6 +386,6 @@ async function iniciar() {
 }
 
 // Para automação/testes pelo console.
-window.gerador = { estado, gerar, refazerProibidas, aplicarDicas, palavrasSemDica, serializar, indiceAtualizado };
+window.gerador = { estado, gerar, refazerProibidas, aplicarDicas, palavrasSemDica, serializar, indiceAtualizado, escolherBanco, carregarBase };
 
 iniciar();

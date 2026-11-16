@@ -25,6 +25,7 @@
     "#A#MEDICA#TUA",
     "FRIO#AMA#PESO"
   ],
+  "banco": ["ALUNA", "COSMO", "DOSES", "GASES", "RAMOS"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Bolo ___ fubá", "resposta": "DE"},
     {"linha": 0, "coluna": 1, "direcao": "baixo", "texto": "Pronome masculino", "resposta": "ELE"},

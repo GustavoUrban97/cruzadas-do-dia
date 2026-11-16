@@ -25,6 +25,7 @@
     "SETE#EVA#ANUS",
     "#SEM#RIO#LEME"
   ],
+  "banco": ["AIPO", "ICONE", "LEOA"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Presente divino", "resposta": "DADIVA"},
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Tem ouvidos, dizem", "resposta": "PAREDE"},

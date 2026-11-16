@@ -25,6 +25,7 @@
     "#COCA#LEVANTE",
     "#AREIA#MELOES"
   ],
+  "banco": ["ATEAR", "ETA", "TORA"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Fileiras", "resposta": "ALAS"},
     {"linha": 0, "coluna": 2, "direcao": "direita-baixo", "texto": "Não militar", "resposta": "CIVIL"},

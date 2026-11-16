@@ -25,6 +25,7 @@
     "U#OCA#EXTREMA",
     "#USOS#SAO#MAR"
   ],
+  "banco": ["ETA", "SINA", "USOS"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Ajuda o padre", "resposta": "DIACONO"},
     {"linha": 0, "coluna": 1, "direcao": "direita-baixo", "texto": "Espinhos no deserto", "resposta": "CACTO"},

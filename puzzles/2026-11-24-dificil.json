@@ -25,6 +25,7 @@
     "#BOBAO#ACUCAR",
     "#IRIS#ELO#ALA"
   ],
+  "banco": ["AIPO", "OLE", "ROSCA"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "baixo", "texto": "Bolo ___ cenoura", "resposta": "DE"},
     {"linha": 0, "coluna": 1, "direcao": "direita-baixo", "texto": "Pode chegar!", "resposta": "ENTRE"},

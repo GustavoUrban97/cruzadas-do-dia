@@ -25,6 +25,7 @@
     "#SAI#VIRO#AMO",
     "FOR#POR#SARAR"
   ],
+  "banco": ["EROS", "PROL", "ROER"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita", "texto": "Mora no móvel esquecido", "resposta": "PO"},
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Em ___ de", "resposta": "PROL"},

@@ -25,6 +25,7 @@
     "LAVA#ALI#PELO",
     "#ROLAR#ATE#AS"
   ],
+  "banco": ["ABADE", "ALAS", "EITA", "TATO"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Pronome relativo", "resposta": "QUE"},
     {"linha": 0, "coluna": 2, "direcao": "direita-baixo", "texto": "Que serve", "resposta": "UTIL"},

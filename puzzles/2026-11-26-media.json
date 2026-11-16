@@ -25,6 +25,7 @@
     "#OLHA#ELE#ATE",
     "#MAOS#SAMURAI"
   ],
+  "banco": ["ARCAR", "HIDRA", "POREI", "SAOS"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Permuta", "resposta": "TROCA"},
     {"linha": 0, "coluna": 2, "direcao": "baixo", "texto": "Atmosfera", "resposta": "AR"},

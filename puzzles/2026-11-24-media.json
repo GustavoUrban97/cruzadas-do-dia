@@ -25,6 +25,7 @@
     "#MANCHAS#NONO",
     "#ELA#ALO#SUAR"
   ],
+  "banco": ["CUSPE", "GNOMO", "PINGO", "SARI"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Esporte na neve", "resposta": "ESQUI"},
     {"linha": 0, "coluna": 1, "direcao": "baixo", "texto": "Criatura", "resposta": "SER"},

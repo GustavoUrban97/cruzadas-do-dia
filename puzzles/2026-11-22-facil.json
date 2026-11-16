@@ -25,6 +25,7 @@
     "PARA#NAVE#ORA",
     "#SAO#ORAL#SOS"
   ],
+  "banco": ["ADAO", "ARES", "ORAL", "ORAR", "SELOS"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Socorrer", "resposta": "AJUDAR"},
     {"linha": 0, "coluna": 2, "direcao": "direita-baixo", "texto": "Primeiro número", "resposta": "UM"},

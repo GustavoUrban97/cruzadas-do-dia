@@ -25,6 +25,7 @@
     "#ALA#MEU#BONE",
     "#SALTA#ATOMOS"
   ],
+  "banco": ["CAFES", "CITAR", "CORO", "MUMIA", "SALTA"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Milionária", "resposta": "RICA"},
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Mencionar", "resposta": "CITAR"},

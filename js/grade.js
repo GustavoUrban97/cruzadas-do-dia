@@ -92,14 +92,36 @@ export function renderizarGrade(elemento, puzzle) {
 }
 
 /**
+ * Banco: algumas palavras raras da grade, impressas de ponta-cabeça embaixo
+ * dela, como ajuda (no jornal elas ficam num canto, invertidas).
+ */
+export function renderizarBanco(elemento, puzzle) {
+  const palavras = Array.isArray(puzzle.banco) ? puzzle.banco : [];
+  elemento.replaceChildren();
+  elemento.hidden = palavras.length === 0;
+  if (!palavras.length) return;
+  const span = document.createElement('span');
+  const titulo = document.createElement('b');
+  titulo.textContent = 'BANCO:';
+  span.append(titulo, ` ${palavras.join(' · ')}`);
+  elemento.append(span);
+}
+
+/**
  * Dimensiona a grade para ocupar o espaço disponível. As casas podem ficar
  * um pouco mais altas que largas (como na revista), até o limite de 1,3.
+ * `banco` (opcional) fica embaixo da grade: desconta a altura dele e
+ * acompanha a largura da grade.
  */
-export function ajustarTamanho(elemento, area, puzzle) {
+export function ajustarTamanho(elemento, area, puzzle, banco = null) {
   const { width, height } = area.getBoundingClientRect();
   const estilo = getComputedStyle(area);
   const w = width - parseFloat(estilo.paddingLeft) - parseFloat(estilo.paddingRight);
-  const h = height - parseFloat(estilo.paddingTop) - parseFloat(estilo.paddingBottom);
+  let h = height - parseFloat(estilo.paddingTop) - parseFloat(estilo.paddingBottom);
+  if (banco && !banco.hidden) {
+    const margem = parseFloat(getComputedStyle(banco).marginTop) || 0;
+    h -= banco.offsetHeight + margem;
+  }
   const proporcaoMax = 1.3; // altura / largura de cada casa
 
   let larguraCasa = w / puzzle.largura;
@@ -109,6 +131,7 @@ export function ajustarTamanho(elemento, area, puzzle) {
 
   elemento.style.width = `${Math.floor(larguraCasa * puzzle.largura)}px`;
   elemento.style.height = `${Math.floor(alturaCasa * puzzle.altura)}px`;
+  if (banco) banco.style.width = elemento.style.width;
   encaixarTextos(elemento);
 }
 

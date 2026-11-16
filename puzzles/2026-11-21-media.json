@@ -25,6 +25,7 @@
     "#SAI#TIA#ORAL",
     "POR#MORSE#AMO"
   ],
+  "banco": ["ALAS", "ARCOS", "RALE", "SAOS"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Patrimônio", "resposta": "BEM"},
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Pecados capitais", "resposta": "SETE"},

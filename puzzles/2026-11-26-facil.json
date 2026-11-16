@@ -25,6 +25,7 @@
     "#CAVAR#NASCER",
     "#ORAR#MAL#AMA"
   ],
+  "banco": ["ADAO", "BARRO", "ORAL", "ORAR", "UVA"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Anéis e colares", "resposta": "JOIAS"},
     {"linha": 0, "coluna": 2, "direcao": "baixo", "texto": "Panda, por exemplo", "resposta": "URSO"},

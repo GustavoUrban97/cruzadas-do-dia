@@ -25,6 +25,7 @@
     "#DA#VOAR#DAMA",
     "VOO#AULA#ASAS"
   ],
+  "banco": ["ADAO", "APTO", "GRAO", "IOGA", "UMIDO"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Prisão", "resposta": "CADEIA"},
     {"linha": 0, "coluna": 2, "direcao": "baixo", "texto": "Divindades", "resposta": "DEUSES"},

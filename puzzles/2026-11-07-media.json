@@ -25,6 +25,7 @@
     "ODOR#IRA#ANDA",
     "#ASA#SEU#SAOS"
   ],
+  "banco": ["ABC", "HAREM", "SAOS", "YIN"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Usado para remar", "resposta": "REMO"},
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Garota", "resposta": "MENINA"},

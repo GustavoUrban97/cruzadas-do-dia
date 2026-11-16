@@ -25,6 +25,7 @@
     "ATE#ORAL#VALA",
     "#EU#RARA#ORAR"
   ],
+  "banco": ["BONE", "IRIS", "ORAL", "ORAR", "VALA"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Veículo espacial", "resposta": "NAVE"},
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Agasalho de frio", "resposta": "CASACO"},

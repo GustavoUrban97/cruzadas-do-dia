@@ -25,6 +25,7 @@
     "#P#BARCO#ANEL",
     "PAPAI#AR#ROMA"
   ],
+  "banco": ["IMPOR", "MOTIM", "ORAR", "PURE", "VENUS"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Simples", "resposta": "FACIL"},
     {"linha": 0, "coluna": 1, "direcao": "baixo", "texto": "Gente grande", "resposta": "ADULTO"},

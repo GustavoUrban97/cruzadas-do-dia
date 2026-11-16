@@ -25,6 +25,7 @@
     "U#DEUSES#CAMA",
     "#BOM#EM#PARAR"
   ],
+  "banco": ["GRADE", "MACIO", "ORAR", "PATAS", "RECEM"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita", "texto": "Bolo ___ fubá", "resposta": "DE"},
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "De + os", "resposta": "DOS"},

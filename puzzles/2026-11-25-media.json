@@ -25,6 +25,7 @@
     "#ALCA#AR#DOAR",
     "FRIA#ERA#OSSO"
   ],
+  "banco": ["AFRO", "ALCA", "ETER", "RELVA"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Em direção a", "resposta": "PARA"},
     {"linha": 0, "coluna": 2, "direcao": "direita-baixo", "texto": "Artigo indefinido", "resposta": "UMA"},

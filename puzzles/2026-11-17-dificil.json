@@ -25,6 +25,7 @@
     "#N#ATELIE#ATE",
     "PUS#ORAR#ARES"
   ],
+  "banco": ["ARO", "TEAR", "USOS"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Xeque", "resposta": "EMIR"},
     {"linha": 0, "coluna": 2, "direcao": "direita-baixo", "texto": "Resposta", "resposta": "REACAO"},

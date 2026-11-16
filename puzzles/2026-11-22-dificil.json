@@ -25,6 +25,7 @@
     "##NO#MAE#OURO",
     "AVE#BOLSA#MAS"
   ],
+  "banco": ["ERETO", "ICAR", "LIXA"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Seções", "resposta": "SETORES"},
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Cento", "resposta": "CEM"},

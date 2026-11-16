@@ -81,6 +81,7 @@ Usar **Pointer Events** (`pointerType`):
 - **Retrato é a orientação principal.** A grade (sempre 13×17) ocupa a tela toda; as casas podem ser um pouco mais altas que largas, como na revista. Em paisagem a grade fica centralizada (menor).
 - Visual de revista: fundo papel (off-white), linhas finas pretas, **casas de dica em cinza bem claro** com texto pequeno centralizado em fonte serifada. Casa com duas dicas: dividida ao meio por linha tracejada, uma dica em cada metade.
 - Setas pequenas na borda da casa onde a resposta começa, sem atrapalhar a escrita da letra.
+- **Banco** (como no jornal): faixa fina embaixo da grade, à direita, com algumas palavras raras da própria grade escritas **de ponta-cabeça**, sempre visível. Fica fora da camada de tinta (não muda as coordenadas dos traços); a grade desconta a altura dela.
 - A camada de tinta cobre a grade inteira (casas de letra e de dica aceitam escrita).
 - Traços salvos em **coordenadas normalizadas** relativas à grade, para continuarem no lugar ao girar a tela ou redimensionar.
 - Cabeçalho em **duas barras**: em cima o dia (data por extenso, seletor **Fácil · Média · Difícil**, número do puzzle e versão discretos, Ontem/Hoje e o ícone do histórico); embaixo a escrita (caneta e cores, lápis, borracha, desfazer, refazer) e o **Terminei** à direita. Em retrato a grade é limitada pela largura, então a segunda barra não a diminui. Tudo precisa caber em ~600 px de largura (o ano da data some abaixo de 760 px).
@@ -126,6 +127,7 @@ Como no jornal, sem ajuda durante o dia:
   "largura": 13,
   "altura": 17,
   "grade": ["#############", "#SOPA#......", "..."],
+  "banco": ["AMA", "ANU", "SOR"],
   "dicas": [
     { "linha": 1, "coluna": 0, "direcao": "direita", "texto": "Caldo quente", "resposta": "SOPA" },
     { "linha": 0, "coluna": 1, "direcao": "baixo", "texto": "___ Catarina", "resposta": "SANTA" }
@@ -134,6 +136,7 @@ Como no jornal, sem ajuda durante o dia:
 ```
 
 - **Tamanho fixo: 13 colunas × 17 linhas**, todo dia e nos três níveis.
+- `banco` (opcional): palavras de ajuda mostradas de ponta-cabeça embaixo da grade. Todas precisam estar na grade. O gerador escolhe as mais raras (de preferência de 3 a 5 letras, nunca proibidas): 5 no fácil, 4 na média, 3 no difícil.
 - `nivel`: `facil`, `media` ou `dificil`; o arquivo se chama `AAAA-MM-DD-nivel.json`. O `id` é único entre todos os puzzles.
 - `#` = casa de dica. Casa `#` sem nenhuma dica aparece como casa preta. Letras maiúsculas sem acento (padrão de cruzadas brasileiras).
 - Cada dica fica na casa `(linha, coluna)`, que precisa ser `#`. No máximo **2 dicas por casa**; a primeira da lista ocupa a metade de cima (de preferência a que aponta para a direita, → ou ↴; a que desce fica embaixo). Quando as duas saem pela lateral (→ e ↴), cada seta fica na altura da sua dica.
@@ -151,8 +154,8 @@ Como no jornal, sem ajuda durante o dia:
 
 Fora do app (não entram no service worker):
 
-1. `validar.py` — lê todos os JSON de `puzzles/` e falha se: grade diferente de 13×17; caractere inválido; dica fora de casa `#` ou apontando para casa que não é letra; mais de 2 dicas na mesma casa; palavra da grade (2+ letras) sem dica, ou com mais de uma; `resposta` não bate com a grade; palavra repetida no mesmo puzzle; `nivel` ausente ou inválido; nome do arquivo diferente de `data-nivel`; `id` repetido. Avisa (sem falhar) sobre dicas longas demais. Ao final, **regenera `puzzles/index.json`** no formato `{"datas": {"AAAA-MM-DD": ["facil", "media", "dificil"]}}`.
-2. `gerador.html` — página em JavaScript (sem build) que roda no navegador com o servidor local (`http://localhost:8000/tools/gerador.html`). Gera um lote (dias × níveis) em Web Workers. Sorteia um esqueleto 13×17 diferente a cada puzzle (bordas e miolo; toda palavra com seta para o seu início, toda casa de dica com ao menos uma dica) e preenche com palavras em português (lista de frequência FrequencyWords pt_br_50k filtrada pelo dicionário pythonprobr/palavras, ambas baixadas por URL e fora do repositório por causa das licenças; sem acentos; sem as palavras de `tools/proibidas.txt`: estrangeirismos, siglas, nomes próprios, palavrões; por nível: fácil só com palavras comuns e palavras de até 6 letras, difícil com menos casas de dica e palavras menos usuais, mas palavras de 2–3 letras sempre das mais comuns). Sem repetir palavras no puzzle, nem palavras de 5+ letras num intervalo de 30 dias. Atribui cada palavra a uma casa de dica vizinha (no máximo 2 por casa), aplica os textos das dicas colados em JSON (`{"facil": {"PALAVRA": "texto"}}`, por nível ou por arquivo) e salva os arquivos e o `index.json` na pasta `puzzles/` ("Salvar na pasta…", Chrome/Edge no PC). Títulos pelo dia da semana: "Terça tranquila", "Terça-feira", "Terça de mestre".
+1. `validar.py` — lê todos os JSON de `puzzles/` e falha se: grade diferente de 13×17; caractere inválido; dica fora de casa `#` ou apontando para casa que não é letra; mais de 2 dicas na mesma casa; palavra da grade (2+ letras) sem dica, ou com mais de uma; `resposta` não bate com a grade; palavra repetida no mesmo puzzle; `banco` com palavra que não está na grade; `nivel` ausente ou inválido; nome do arquivo diferente de `data-nivel`; `id` repetido. Avisa (sem falhar) sobre dicas longas demais. Ao final, **regenera `puzzles/index.json`** no formato `{"datas": {"AAAA-MM-DD": ["facil", "media", "dificil"]}}`.
+2. `gerador.html` — página em JavaScript (sem build) que roda no navegador com o servidor local (`http://localhost:8000/tools/gerador.html`). Gera um lote (dias × níveis) em Web Workers. Sorteia um esqueleto 13×17 diferente a cada puzzle (bordas e miolo; toda palavra com seta para o seu início, toda casa de dica com ao menos uma dica) e preenche com palavras em português (lista de frequência FrequencyWords pt_br_50k filtrada pelo dicionário pythonprobr/palavras, ambas baixadas por URL e fora do repositório por causa das licenças; sem acentos; sem as palavras de `tools/proibidas.txt`: estrangeirismos, siglas, nomes próprios, palavrões; por nível: fácil só com palavras comuns e palavras de até 6 letras, difícil com menos casas de dica e palavras menos usuais, mas palavras de 2–3 letras sempre das mais comuns). Sem repetir palavras no puzzle, nem palavras de 5+ letras num intervalo de 30 dias. Atribui cada palavra a uma casa de dica vizinha (no máximo 2 por casa), aplica os textos das dicas colados em JSON (`{"facil": {"PALAVRA": "texto"}}`, por nível ou por arquivo) escolhe o `banco` e salva os arquivos e o `index.json` na pasta `puzzles/` ("Salvar na pasta…", Chrome/Edge no PC). Títulos pelo dia da semana: "Terça tranquila", "Terça-feira", "Terça de mestre".
 3. Dicas escritas em lotes (lotes de 10 dias) e revisadas por mim. Não copiar puzzles de revistas, jornais ou apps.
 
 ## GitHub Pages e CI

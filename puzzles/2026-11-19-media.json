@@ -25,6 +25,7 @@
     "NADAR#PANTERA",
     "#ROSA#ESSE#AS"
   ],
+  "banco": ["ACESO", "ANZOL", "LAMBE", "SODIO"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Ceder", "resposta": "DAR"},
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Passa a língua", "resposta": "LAMBE"},

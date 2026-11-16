@@ -25,6 +25,7 @@
     "BEM#SEM#PEOES",
     "#SETOR#MES#MA"
   ],
+  "banco": ["ETER", "NATO", "PASTO", "PEOES"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "___ é o seu nome?", "resposta": "QUAL"},
     {"linha": 0, "coluna": 2, "direcao": "direita-baixo", "texto": "De + as", "resposta": "DAS"},

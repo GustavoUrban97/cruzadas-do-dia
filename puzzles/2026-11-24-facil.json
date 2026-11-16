@@ -25,6 +25,7 @@
     "#ARVORE#JAULA",
     "#RAIZES#ARMAR"
   ],
+  "banco": ["ARMAR", "CEGAS", "MACIA", "ORAL", "SATA"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Não é macho", "resposta": "FEMEA"},
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Pavor", "resposta": "MEDO"},

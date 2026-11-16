@@ -25,6 +25,7 @@
     "#AMA#TRAVA#VE",
     "TROUXE#SE#MAU"
   ],
+  "banco": ["BAU", "IRADO", "ORAR", "RIMA", "TRAVA"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Conversa", "resposta": "PAPO"},
     {"linha": 0, "coluna": 1, "direcao": "baixo", "texto": "Embaixo", "resposta": "ABAIXO"},

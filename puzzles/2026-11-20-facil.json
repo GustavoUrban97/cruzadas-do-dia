@@ -25,6 +25,7 @@
     "#POR#VAI#SATA",
     "SEMANA#MOISES"
   ],
+  "banco": ["ARAME", "BALE", "IRIS", "RIMA", "SATA"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Figura", "resposta": "IMAGEM"},
     {"linha": 0, "coluna": 1, "direcao": "direita-baixo", "texto": "Mudar", "resposta": "VARIAR"},

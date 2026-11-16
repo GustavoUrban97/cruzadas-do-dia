@@ -1,7 +1,7 @@
 // Inicialização e escolha do puzzle por data e nível.
 
 import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre, somarDias } from './datas.js';
-import { renderizarGrade, ajustarTamanho, colocarGabarito } from './grade.js';
+import { renderizarGrade, renderizarBanco, ajustarTamanho, colocarGabarito } from './grade.js';
 import { Tinta } from './tinta.js';
 import { iniciarDiagnostico } from './diagnostico.js';
 import { iniciarHistorico } from './historico.js';
@@ -11,7 +11,7 @@ import { carregarTinta, salvarTinta, pedirPersistencia, carregarRegistro, atuali
 // Versão do app, mostrada discretamente no cabeçalho.
 // IMPORTANTE: precisa ser igual à VERSAO de sw.js, que deve subir a cada mudança
 // em HTML/CSS/JS (é o que faz o tablet perceber que há versão nova).
-const VERSAO = 11;
+const VERSAO = 12;
 
 const $ = id => document.getElementById(id);
 const parametros = new URLSearchParams(location.search);
@@ -411,8 +411,9 @@ async function iniciar() {
     }
 
     renderizarGrade($('grade'), puzzle);
+    renderizarBanco($('banco'), puzzle);
     if (data < hoje()) colocarGabarito($('grade'), puzzle); // como no jornal: só no dia seguinte
-    const ajustar = () => ajustarTamanho($('grade'), $('folha'), puzzle);
+    const ajustar = () => ajustarTamanho($('grade'), $('folha'), puzzle, $('banco'));
     ajustar();
     // Girar a tela ou redimensionar a janela: recalcula o tamanho das casas.
     new ResizeObserver(() => requestAnimationFrame(ajustar)).observe($('folha'));

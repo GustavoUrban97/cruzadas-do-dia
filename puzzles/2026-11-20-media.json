@@ -25,6 +25,7 @@
     "#NUM#ATE#AMOR",
     "#SAO#SE#OS#MA"
   ],
+  "banco": ["AMAS", "EIXOS", "GOLS", "RENAL"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "baixo", "texto": "Acompanhado", "resposta": "COM"},
     {"linha": 0, "coluna": 0, "direcao": "baixo-direita", "texto": "Placa de metal", "resposta": "CHAPA"},

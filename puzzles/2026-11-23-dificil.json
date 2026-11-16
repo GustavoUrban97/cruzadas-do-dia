@@ -25,6 +25,7 @@
     "#PELA#CASEIRA",
     "#AMASSAR#MAOS"
   ],
+  "banco": ["ARO", "SOR", "URNAS"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Colocar", "resposta": "POR"},
     {"linha": 0, "coluna": 2, "direcao": "baixo", "texto": "Guarda o segredo", "resposta": "CADEADO"},

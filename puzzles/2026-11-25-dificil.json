@@ -25,6 +25,7 @@
     "#MESTRA#METAL",
     "PAREO#RUA#ERA"
   ],
+  "banco": ["ICAR", "RAIAR", "TIL"],
   "dicas": [
     {"linha": 0, "coluna": 0, "direcao": "direita-baixo", "texto": "Contrapor", "resposta": "OPOR"},
     {"linha": 0, "coluna": 2, "direcao": "baixo", "texto": "Dar a largada", "resposta": "INICIAR"},
