@@ -94,6 +94,37 @@ export function atualizarRegistro(data, mudancas) {
   }).then(() => novo);
 }
 
+// ---------- Tudo de uma vez (histórico e backup) ----------
+
+/** Todas as entradas de tinta e de registro: { tinta: [...], registro: [...] }. */
+export function lerTudo() {
+  return abrir().then(banco => new Promise((resolver, rejeitar) => {
+    const tx = banco.transaction([LOJA_TINTA, LOJA_REGISTRO], 'readonly');
+    const tinta = tx.objectStore(LOJA_TINTA).getAll();
+    const registro = tx.objectStore(LOJA_REGISTRO).getAll();
+    tx.oncomplete = () => resolver({ tinta: tinta.result, registro: registro.result });
+    tx.onerror = () => rejeitar(tx.error);
+    tx.onabort = () => rejeitar(tx.error || new Error('transação abortada'));
+  }));
+}
+
+/**
+ * Grava as entradas de um backup numa transação só (ou entra tudo, ou nada).
+ * Cada data do backup substitui a mesma data deste aparelho; as outras ficam.
+ */
+export function gravarBackup({ tinta, registro }) {
+  return abrir().then(banco => new Promise((resolver, rejeitar) => {
+    const tx = banco.transaction([LOJA_TINTA, LOJA_REGISTRO], 'readwrite');
+    const lojaTinta = tx.objectStore(LOJA_TINTA);
+    const lojaRegistro = tx.objectStore(LOJA_REGISTRO);
+    tinta.forEach(item => lojaTinta.put(item));
+    registro.forEach(item => lojaRegistro.put(item));
+    tx.oncomplete = () => resolver();
+    tx.onerror = () => rejeitar(tx.error);
+    tx.onabort = () => rejeitar(tx.error || new Error('transação abortada'));
+  }));
+}
+
 /**
  * Pede ao navegador para não apagar os dados sozinho quando faltar espaço.
  * O Chrome decide (costuma aceitar para sites instalados/muito usados).

@@ -20,6 +20,9 @@
       <button type="button" class="botao-texto" id="terminei" hidden aria-pressed="false">Terminei</button>
       <button type="button" class="botao-texto" id="ir-ontem" hidden>Ontem</button>
       <button type="button" class="botao-texto" id="ir-hoje" hidden>Hoje</button>
+      <button type="button" class="botao-icone" id="abrir-historico" title="Meu histórico" aria-label="Meu histórico">
+        <svg viewBox="0 0 24 24"><path d="M5 20V12 M10 20V6 M15 20v-9 M20 20V9 M3 20.5h18" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
     </span>
 
     <nav class="ferramentas" aria-label="Ferramentas">
@@ -63,6 +66,53 @@
     <button type="button" class="botao-texto alternar-gabarito" id="alternar-gabarito">Ocultar gabarito</button>
   </div>
   <div class="toast" id="toast" role="status" hidden></div>
+
+  <!-- Painel "Meu histórico": estatísticas, calendário e backup -->
+  <dialog class="painel" id="historico" aria-labelledby="historico-titulo">
+    <div class="painel-quadro">
+      <div class="painel-topo">
+        <h2 id="historico-titulo">Meu histórico</h2>
+        <button type="button" class="botao-icone" id="fechar-historico" title="Fechar" aria-label="Fechar">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12 M18 6L6 18" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <p class="historico-erro" id="historico-erro"></p>
+
+      <div class="numeros">
+        <div><strong id="est-jogados">0</strong><span>jogados</span></div>
+        <div><strong id="est-porcentagem">0</strong><span>% acertei tudo</span></div>
+        <div><strong id="est-atual">0</strong><span>sequência atual</span></div>
+        <div><strong id="est-melhor">0</strong><span>melhor sequência</span></div>
+      </div>
+
+      <h3>Distribuição</h3>
+      <div class="distribuicao" id="distribuicao"></div>
+
+      <div class="mes">
+        <button type="button" class="botao-icone" id="mes-anterior" aria-label="Mês anterior">
+          <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <h3 id="mes-nome"></h3>
+        <button type="button" class="botao-icone" id="mes-seguinte" aria-label="Mês seguinte">
+          <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div class="calendario" id="calendario"></div>
+      <div class="legenda">
+        <span><i class="estado-acertei-tudo"></i>Acertei tudo</span>
+        <span><i class="estado-errei-algumas"></i>Errei algumas</span>
+        <span><i class="estado-nao-terminei"></i>Não terminei</span>
+        <span><i class="estado-jogou"></i>Falta avaliar</span>
+      </div>
+
+      <div class="backup">
+        <span>Backup (tinta e registro):</span>
+        <button type="button" class="botao-texto" id="exportar">Exportar</button>
+        <button type="button" class="botao-texto" id="importar">Importar</button>
+        <input type="file" id="arquivo-backup" accept=".json,application/json" hidden>
+      </div>
+    </div>
+  </dialog>
 
   <main class="folha" id="folha">
     <!-- O "papel" envolve a grade e recebe a camada de tinta (canvas) por cima. -->

@@ -181,6 +181,124 @@ body {
   color: var(--papel);
 }
 
+.botao-icone {
+  width: 40px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.botao-icone svg { width: 22px; height: 22px; }
+.botao-icone:disabled { opacity: 0.25; cursor: default; }
+
+/* ---------- Painel "Meu histórico" ---------- */
+
+.painel {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1.5px solid var(--linha);
+  border-radius: 10px;
+  background: var(--papel);
+  color: var(--tinta);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.painel::backdrop { background: rgba(26, 26, 26, 0.45); }
+.painel-quadro { padding: 0.75rem 1.1rem 1.1rem; }
+.painel h2 { margin: 0; font-size: 1.3rem; }
+.painel h3 { margin: 1rem 0 0.4rem; font-size: 0.95rem; }
+.painel-topo { display: flex; align-items: center; justify-content: space-between; }
+.historico-erro { margin: 0; color: #b3261e; font-size: 0.85rem; font-style: italic; }
+.historico-erro:empty { display: none; }
+
+/* Números (como no Termo) */
+.numeros {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  text-align: center;
+}
+.numeros strong { display: block; font-size: 2rem; line-height: 1.1; }
+.numeros span { font-size: 0.75rem; color: var(--tinta-suave); }
+
+/* Cores dos resultados (barras, calendário, legenda) */
+:root {
+  --acertei: #3f9b57;
+  --errei: #e0b13a;
+  --nao-terminei: #e8a094;
+}
+.estado-acertei-tudo  { background: var(--acertei); color: #fff; }
+.estado-errei-algumas { background: var(--errei); }
+.estado-nao-terminei  { background: var(--nao-terminei); }
+
+.distribuicao { display: grid; gap: 4px; }
+.dist-linha { display: grid; grid-template-columns: 7.5rem 1fr; align-items: center; gap: 0.5rem; }
+.dist-rotulo { font-size: 0.85rem; }
+.dist-trilho { display: block; }
+.dist-barra {
+  display: block;
+  min-width: 1.6rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-align: right;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Calendário */
+.mes { display: flex; align-items: center; justify-content: space-between; margin-top: 0.6rem; }
+.mes h3 { margin: 0; }
+.calendario { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-semana { text-align: center; font-size: 0.75rem; color: var(--tinta-suave); }
+.cal-dia {
+  aspect-ratio: 1;
+  border: 1.5px solid transparent;
+  border-radius: 6px;
+  background: #ebe6d9;      /* não jogou */
+  color: var(--tinta);
+  font: inherit;
+  font-size: 0.9rem;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.cal-dia:disabled { background: transparent; color: #b9b2a3; cursor: default; }
+.cal-dia.estado-acertei-tudo  { background: var(--acertei); color: #fff; }
+.cal-dia.estado-errei-algumas { background: var(--errei); }
+.cal-dia.estado-nao-terminei  { background: var(--nao-terminei); }
+.cal-dia.estado-jogou,
+.cal-dia.estado-terminei { background: var(--papel); border-color: var(--tinta-suave); border-style: dashed; }
+.cal-dia.estado-terminei { border-color: var(--acertei); }
+.cal-dia.hoje { box-shadow: 0 0 0 2px var(--papel), 0 0 0 3.5px var(--linha); font-weight: 700; }
+
+.legenda { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; margin-top: 0.6rem; font-size: 0.75rem; }
+.legenda i {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-right: 0.3rem;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+.legenda i.estado-jogou { border: 1.5px dashed var(--tinta-suave); }
+
+.backup {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #d8d0bd;
+  font-size: 0.85rem;
+}
+
 /* Faixa de avaliação (dias passados) */
 .avaliacao {
   display: flex;

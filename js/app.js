@@ -4,12 +4,13 @@ import { hojeEmBrasilia, dataValida, dataPorExtenso, dataCurta, diasEntre, somar
 import { renderizarGrade, ajustarTamanho, colocarGabarito } from './grade.js';
 import { Tinta } from './tinta.js';
 import { iniciarDiagnostico } from './diagnostico.js';
+import { iniciarHistorico } from './historico.js';
 import { carregarTinta, salvarTinta, pedirPersistencia, carregarRegistro, atualizarRegistro } from './armazenamento.js';
 
 // Versão do app, mostrada discretamente no cabeçalho.
 // IMPORTANTE: precisa ser igual à VERSAO de sw.js, que deve subir a cada mudança
 // em HTML/CSS/JS (é o que faz o tablet perceber que há versão nova).
-const VERSAO = 8;
+const VERSAO = 9;
 
 const $ = id => document.getElementById(id);
 const parametros = new URLSearchParams(location.search);
@@ -416,6 +417,26 @@ async function iniciar() {
       location.assign(endereco(destino));
     };
     configurarDia({ data, arquivo, irPara });
+
+    // Painel "Meu histórico" (estatísticas, calendário, backup).
+    iniciarHistorico({
+      hoje,
+      antesDeLer: () => salvar(),
+      irPara,
+      aoImportar: async gravarBackup => {
+        // Para de salvar a tinta aberta, senão ela gravaria por cima do dia importado.
+        await salvar();
+        const salvarAnterior = salvar;
+        salvar = async () => {};
+        try {
+          await gravarBackup();
+        } catch (erro) {
+          salvar = salvarAnterior;
+          throw erro;
+        }
+        location.reload();
+      },
+    });
 
     // Ao sair do app (trocar de app, apagar a tela), garante a última gravação.
     document.addEventListener('visibilitychange', () => {

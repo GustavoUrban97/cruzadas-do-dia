@@ -40,6 +40,7 @@ js/tinta.js        # captura e desenho dos traços (pincel, borracha, desfazer)
 js/armazenamento.js# IndexedDB
 js/datas.js        # "hoje" em America/Sao_Paulo, formatação
 js/diagnostico.js  # tela ?debug=1
+js/historico.js    # painel "Meu histórico": estatísticas, calendário, backup
 puzzles/
   index.json       # lista de datas disponíveis (gerado pelo validador)
   2026-11-07.json
@@ -102,10 +103,10 @@ Como no jornal, sem ajuda durante o dia:
 - **Hoje:** só a folha. Um botão discreto **"Terminei"** registra que concluí naquele dia (opcional); tocar de novo desfaz. Botão "Ontem" abre o gabarito de ontem, e um lembrete aparece se ontem foi jogado e ainda não avaliado.
 - **Gabarito de ontem:** mostra a grade de ontem com a minha tinta e as respostas sobrepostas **em verde, levemente transparente** (verde para não confundir com nenhuma das cores de caneta). Ali eu avalio o dia: **Acertei tudo**, **Errei algumas** ou **Não terminei** (pode trocar depois). As letras verdes ficam por baixo da tinta e podem ser ocultadas. Qualquer dia passado abre assim; dia futuro nunca mostra respostas.
 - Dia em que nem abri a página: **não jogou**.
-- **Sequência:** dias seguidos em que **terminei** o puzzle (acertando tudo ou errando algumas). "Não terminei" e "não jogou" quebram a sequência.
-- **Estatísticas** no estilo do Termo: dias jogados, % de "acertei tudo", sequência atual e melhor sequência, distribuição entre acertei tudo / errei algumas / não terminei.
+- **Sequência:** dias seguidos em que **terminei** o puzzle (acertando tudo ou errando algumas). "Não terminei" e "não jogou" quebram a sequência, assim como dia jogado sem "Terminei" nem avaliação. "Terminei" ainda sem avaliação conta. Hoje em andamento não quebra.
+- **Estatísticas** no estilo do Termo: dias jogados, % de "acertei tudo", sequência atual e melhor sequência, distribuição entre acertei tudo / errei algumas / não terminei. A % é sobre os dias avaliados. Fica no painel "Meu histórico" (ícone de gráfico no cabeçalho).
 - **Histórico:** calendário dos dias com a cor de cada um; tocar abre o puzzle daquele dia com a minha tinta e o gabarito. Dias passados continuam editáveis, mas editar não altera o registro já marcado.
-- **Backup:** exportar toda a tinta e o registro dos dias como um arquivo JSON e importar de volta (troca de tablet ou dados do Chrome apagados).
+- **Backup:** exportar toda a tinta e o registro dos dias como um arquivo JSON e importar de volta (troca de tablet ou dados do Chrome apagados). Importar substitui, neste aparelho, os dias que estão no arquivo; os outros ficam.
 
 ## Formato do puzzle (JSON)
 
@@ -159,7 +160,7 @@ Scripts Python, fora do app:
 3. **Persistência e ciclo diário:** IndexedDB por data, virada da meia-noite, fallback de puzzle, proteção do gesto de voltar. ✔
 4. **Cores e offline:** caneta preta/azul/vermelha, service worker (offline + aviso de atualização). Sem manifesto/instalação. ✔
 5. **Conferência:** botão "Terminei", gabarito de ontem em verde, avaliação do dia (acertei tudo / errei algumas / não terminei), registro do dia no IndexedDB. ✔
-6. **Histórico, estatísticas e backup:** calendário, sequência, estatísticas estilo Termo, exportar/importar.
+6. **Histórico, estatísticas e backup:** calendário, sequência, estatísticas estilo Termo, exportar/importar. ✔
 7. **Conteúdo:** `gerar_grade.py` e um banco inicial de 30 puzzles.
 
 ## Critérios de aceite

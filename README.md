@@ -25,6 +25,7 @@ Abra `http://localhost:8000`. Para abrir um dia específico: `http://localhost:8
 Abra https://gustavourban97.github.io/cruzadas-do-dia/ no Chrome. A tinta fica salva neste aparelho e neste navegador.
 
 - Quando aparecer **"Atualização disponível"**, toque para recarregar com a versão nova.
+- O ícone de gráfico abre **Meu histórico**: estatísticas, calendário (tocar num dia abre aquele puzzle) e backup. Exporte o backup de vez em quando: a tinta fica só neste aparelho.
 - `?debug=1` no fim do endereço mostra os eventos da caneta (diagnóstico).
 - `?data=AAAA-MM-DD` abre um dia específico (dias passados mostram o gabarito).
 - `?hoje=AAAA-MM-DD` finge que hoje é outra data (para testar).
