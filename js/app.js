@@ -4,6 +4,7 @@ import { hojeEmBrasilia, dataValida, dataPorExtenso, dataAbreviada, dataCurta, d
 import { renderizarGrade, renderizarBanco, ajustarTamanho, colocarGabarito } from './grade.js';
 import { Tinta } from './tinta.js';
 import { Teclado } from './teclado.js';
+import { Conferencia } from './conferencia.js';
 import { iniciarDiagnostico } from './diagnostico.js';
 import { iniciarHistorico } from './historico.js';
 import { NIVEIS, NOMES_NIVEIS, nivelValido } from './niveis.js';
@@ -12,7 +13,7 @@ import { carregarTinta, salvarTinta, pedirPersistencia, carregarRegistro, atuali
 // Versão do app, mostrada discretamente no cabeçalho.
 // IMPORTANTE: precisa ser igual à VERSAO de sw.js, que deve subir a cada mudança
 // em HTML/CSS/JS (é o que faz o tablet perceber que há versão nova).
-const VERSAO = 15;
+const VERSAO = 16;
 
 // Celular (tela estreita): sem caneta, o jogo é só pelo modo teclado.
 // O mesmo limite está no CSS (@media max-width: 599px).
@@ -245,16 +246,35 @@ function precarregarProximos(hoje, indice) {
   }
 }
 
-// ---------- Registro do puzzle: Terminei, gabarito e avaliação ----------
+// ---------- Conferência, gabarito e registro do dia ----------
+
+const ROTULOS_ANTIGOS = { 'acertei-tudo': 'Acertei tudo', 'errei-algumas': 'Errei algumas', 'nao-terminei': 'Não terminei' };
+
+/** Como o dia terminou, para a faixa dos dias passados. */
+function textoDoDia(registro, passado) {
+  if (registro && registro.resolvido) {
+    const n = registro.conferencias || 1;
+    return `Resolvida na ${n}ª conferência · ${n === 1 ? 'acertei tudo' : 'errei algumas'}`;
+  }
+  if (registro && registro.desistiu) return 'Desisti · não terminei';
+  if (registro && registro.avaliacao) return `Avaliação: ${ROTULOS_ANTIGOS[registro.avaliacao] || registro.avaliacao}`;
+  if (registro && registro.terminei) return 'Terminei (sem avaliação)';
+  return passado ? 'Ficou sem conferir · não terminei' : '';
+}
+
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 
 /**
  * Mostra as ações que fazem sentido para o puzzle aberto (data + nível):
- *  - hoje: "Terminei" (marca/desmarca) e "Ontem" (o gabarito de ontem, mesmo nível);
- *  - dia passado: gabarito em verde, avaliação e "Hoje";
+ *  - hoje: "Conferir" (marca erradas e ilegíveis sem mostrar a resposta; tudo certo
+ *    resolve o dia), "Desistir" (mostra as respostas) e "Ontem";
+ *  - dia passado: gabarito em verde, as casas erradas marcadas e como o dia terminou;
  *  - dia futuro (só em teste): apenas "Hoje".
+ * O registro é automático: resolveu na 1ª conferência = acertei tudo; depois de
+ * corrigir = errei algumas; desistiu ou não resolveu = não terminei.
  * Editar a tinta de um dia passado não mexe no registro.
  */
-async function configurarDia({ data, nivel, arquivo, irPara }) {
+async function configurarDia({ data, nivel, arquivo, irPara, puzzle, conferencia, teclado }) {
   const diaDeHoje = hoje();
   const passado = data < diaDeHoje;
 
@@ -265,10 +285,9 @@ async function configurarDia({ data, nivel, arquivo, irPara }) {
     console.error(erro);
   }
 
-  const gravar = async (mudancas, mensagem) => {
+  const gravar = async mudancas => {
     try {
       registro = await atualizarRegistro(data, nivel, { puzzle: arquivo, ...mudancas });
-      if (mensagem) mostrarToast(mensagem);
       return true;
     } catch (erro) {
       console.error(erro);
@@ -283,36 +302,17 @@ async function configurarDia({ data, nivel, arquivo, irPara }) {
     botao.addEventListener('click', () => irPara(diaDeHoje));
   }
 
-  if (data === diaDeHoje) {
-    // "Terminei": opcional; tocar de novo desfaz (caso tenha sido sem querer).
-    const terminei = $('terminei');
-    const pintar = () => {
-      const marcado = Boolean(registro && registro.terminei);
-      terminei.setAttribute('aria-pressed', String(marcado));
-      terminei.textContent = marcado ? '✓ Terminei' : 'Terminei';
-    };
-    pintar();
-    terminei.hidden = false;
-    terminei.addEventListener('click', async () => {
-      const marcar = !(registro && registro.terminei);
-      const nome = NOMES_NIVEIS[nivel].toLowerCase();
-      const ok = await gravar(
-        { terminei: marcar, termineiEm: marcar ? new Date().toISOString() : null },
-        marcar ? `Registrado: terminei a ${nome} de hoje. O gabarito sai amanhã.` : 'Registro desfeito.',
-      );
-      if (ok) pintar();
-    });
-
-    const ontem = somarDias(diaDeHoje, -1);
-    const botaoOntem = $('ir-ontem');
-    botaoOntem.hidden = false;
-    botaoOntem.addEventListener('click', () => irPara(ontem));
-    lembrarOntem(ontem, nivel, irPara);
-  }
-
-  if (passado) {
-    // Gabarito em verde, por baixo da tinta.
+  // Respostas em verde, por baixo da tinta (dias passados, ou hoje depois de desistir).
+  let gabaritoPronto = false;
+  const mostrarGabarito = () => {
     const grade = $('grade');
+    $('avaliacao-texto').textContent = textoDoDia(registro, passado);
+    $('avaliacao').hidden = false;
+    if (gabaritoPronto) return;
+    gabaritoPronto = true;
+    if (!grade.querySelector('.letra-gabarito')) colocarGabarito(grade, puzzle);
+    teclado.conferir = true; // letras digitadas: certa em verde claro, errada riscada
+    teclado.atualizarLetras(Object.keys(teclado.tinta.exportarLetras()));
     const alternar = $('alternar-gabarito');
     const mostrar = visivel => {
       grade.classList.toggle('com-gabarito', visivel);
@@ -326,38 +326,123 @@ async function configurarDia({ data, nivel, arquivo, irPara }) {
     };
     mostrar(lerPreferencia('gabarito', 'mostrar') !== 'ocultar');
     alternar.addEventListener('click', () => mostrar(!grade.classList.contains('com-gabarito')));
+  };
 
-    // Avaliação: pode ser trocada depois, se tocou errado.
-    const opcoes = [...document.querySelectorAll('[data-avaliacao]')];
-    const pintar = () => opcoes.forEach(b =>
-      b.setAttribute('aria-pressed', String(Boolean(registro) && registro.avaliacao === b.dataset.avaliacao)));
+  if (data === diaDeHoje) {
+    const botao = $('conferir');
+    const encerrado = () => Boolean(registro && (registro.resolvido || registro.desistiu));
+    const pintar = () => {
+      botao.textContent = registro && registro.resolvido ? '✓ Resolvida' : (registro && registro.desistiu ? 'Desisti' : 'Conferir');
+      botao.setAttribute('aria-pressed', String(Boolean(registro && registro.resolvido)));
+      botao.disabled = encerrado();
+    };
     pintar();
-    opcoes.forEach(b => b.addEventListener('click', async () => {
-      if (registro && registro.avaliacao === b.dataset.avaliacao) return;
-      const ok = await gravar(
-        { avaliacao: b.dataset.avaliacao, avaliadoEm: new Date().toISOString() },
-        `Registrado: ${b.textContent.toLowerCase()} na ${NOMES_NIVEIS[nivel].toLowerCase()} de ${dataCurta(data)}.`,
-      );
-      if (ok) pintar();
-    }));
-    $('avaliacao').hidden = false;
+    botao.hidden = false;
+    if (registro && registro.desistiu) mostrarGabarito();
+
+    const faixa = $('resultado');
+    let ultimo = null; // resultado da última conferência
+
+    const resolver = async () => {
+      const n = (registro && registro.conferencias) || 1;
+      const agora = new Date().toISOString();
+      const ok = await gravar({
+        resolvido: true, resolvidoEm: agora, terminei: true, termineiEm: agora,
+        avaliacao: n === 1 ? 'acertei-tudo' : 'errei-algumas', avaliadoEm: agora,
+      });
+      if (!ok) return;
+      faixa.hidden = true;
+      conferencia.limparMarcas();
+      mostrarToast(n === 1 ? 'Tudo certo de primeira! 🎉' : `Tudo certo! 🎉 Resolvida na ${n}ª conferência.`);
+      pintar();
+    };
+
+    const mostrarResultado = () => {
+      const { erradas, ilegiveis, vazias } = ultimo;
+      const partes = [];
+      if (erradas.length) partes.push(plural(erradas.length, 'errada', 'erradas'));
+      if (ilegiveis.length) partes.push(`${plural(ilegiveis.length, 'casa', 'casas')} que não consegui ler`);
+      if (vazias.length) partes.push(plural(vazias.length, 'vazia', 'vazias'));
+      $('resultado-texto').textContent = partes.join(' · ');
+      $('aceitar-ilegiveis').hidden = ilegiveis.length === 0;
+      faixa.hidden = false;
+    };
+
+    botao.addEventListener('click', async () => {
+      if (encerrado()) return;
+      botao.disabled = true;
+      botao.textContent = 'Conferindo…';
+      try {
+        ultimo = await conferencia.conferir();
+      } catch (erro) {
+        console.error(erro);
+        mostrarAviso('Não foi possível conferir agora (o reconhecimento de letras não carregou).');
+        pintar();
+        return;
+      }
+      const ok = await gravar({ conferencias: ((registro && registro.conferencias) || 0) + 1 });
+      if (!ok) { pintar(); return; }
+      if (!ultimo.erradas.length && !ultimo.ilegiveis.length && !ultimo.vazias.length) {
+        await resolver();
+      } else {
+        conferencia.marcar(ultimo);
+        mostrarResultado();
+        pintar();
+      }
+    });
+
+    // O reconhecimento não leu, mas a letra está certa: conta como certa.
+    $('aceitar-ilegiveis').addEventListener('click', async () => {
+      if (!ultimo) return;
+      conferencia.aceitar(ultimo.ilegiveis);
+      ultimo = { ...ultimo, ilegiveis: [] };
+      if (!ultimo.erradas.length && !ultimo.vazias.length) await resolver();
+      else mostrarResultado();
+    });
+
+    $('desistir').addEventListener('click', async () => {
+      if (!confirm('Desistir e ver as respostas? O dia conta como "não terminei".')) return;
+      const agora = new Date().toISOString();
+      const ok = await gravar({ desistiu: true, desistiuEm: agora, avaliacao: 'nao-terminei', avaliadoEm: agora });
+      if (!ok) return;
+      faixa.hidden = true;
+      conferencia.limparMarcas();
+      mostrarGabarito();
+      pintar();
+    });
+
+    $('fechar-resultado').addEventListener('click', () => { faixa.hidden = true; });
+
+    const ontem = somarDias(diaDeHoje, -1);
+    const botaoOntem = $('ir-ontem');
+    botaoOntem.hidden = false;
+    botaoOntem.addEventListener('click', () => irPara(ontem));
+    lembrarOntem(ontem, nivel, irPara);
+  }
+
+  if (passado) {
+    mostrarGabarito();
+    // Marca as casas erradas do jeito que ficaram (quando o modelo carregar).
+    conferencia.conferir()
+      .then(res => conferencia.marcar({ erradas: res.erradas, ilegiveis: [] }))
+      .catch(erro => console.error(erro));
   }
 }
 
 /**
- * Algum puzzle de ontem jogado (tinta ou "Terminei") e ainda sem avaliação:
- * mostra um lembrete discreto. O nível aberto tem preferência.
+ * Algum puzzle de ontem escrito e que ficou sem resolver (nem desistir): mostra
+ * um lembrete discreto para ver o gabarito. O nível aberto tem preferência.
  */
 async function lembrarOntem(ontem, nivelAberto, irPara) {
   const ordem = [nivelAberto, ...NIVEIS.filter(n => n !== nivelAberto)];
   for (const nivel of ordem) {
     try {
       const [registro, folha] = await Promise.all([carregarRegistro(ontem, nivel), carregarTinta(ontem, nivel)]);
-      if (registro && registro.avaliacao) continue;
+      if (registro && (registro.resolvido || registro.desistiu || registro.avaliacao)) continue;
       const escreveu = folha.tracos.length > 0 || Object.keys(folha.letras).length > 0;
-      if (!(registro && registro.terminei) && !escreveu) continue;
+      if (!escreveu) continue;
       const faixa = $('lembrete-ontem');
-      faixa.textContent = `Gabarito de ontem (${NOMES_NIVEIS[nivel]}) disponível · toque para avaliar`;
+      faixa.textContent = `Ontem (${NOMES_NIVEIS[nivel]}) ficou sem conferir · toque para ver o gabarito`;
       faixa.hidden = false;
       faixa.onclick = () => irPara(ontem, nivel);
       return;
@@ -458,6 +543,7 @@ async function iniciar() {
     let persistenciaPedida = false;
     let salvar = () => {};
     let teclado = null;
+    let conferencia = null;
 
     const tinta = new Tinta($('papel'), {
       colunas: puzzle.largura,
@@ -468,7 +554,10 @@ async function iniciar() {
         $('desfazer').disabled = !podeDesfazer;
         $('refazer').disabled = !podeRefazer;
       },
-      aoMudar: () => salvar(),          // ao fim de cada traço, apagada, desfazer, refazer
+      aoMudar: () => {                  // ao fim de cada traço, apagada, desfazer, refazer
+        salvar();
+        if (conferencia) conferencia.aoMudarTinta(); // lê em segundo plano as casas que mudaram
+      },
       aoTerminarGesto: () => {
         armarVoltar();
         if (!persistenciaPedida) { persistenciaPedida = true; pedirPersistencia(); }
@@ -493,6 +582,12 @@ async function iniciar() {
       aoMudarVisibilidade: ajustar,
     });
     tinta.importar(salvos.tracos, salvos.letras);
+    // Conferência (hoje e dias passados; dia futuro, só em teste, não confere).
+    if (data <= hoje()) {
+      conferencia = new Conferencia({ puzzle, tinta, grade: $('grade') });
+      // O modelo de letras carrega sem pressa, depois que a folha já está na tela.
+      setTimeout(() => conferencia.preparar().catch(erro => console.error(erro)), 800);
+    }
     // Se não deu para ler a tinta guardada, não grava por cima dela (perderia o que já estava lá).
     salvar = leuTinta ? criarSalvador(data, nivel, tinta) : async () => {};
     salvarAntesDeSair = () => salvar();
@@ -504,7 +599,7 @@ async function iniciar() {
       await salvar();
       location.assign(endereco(destino, destinoNivel));
     };
-    configurarDia({ data, nivel, arquivo, irPara: (d, n) => irPara(d, n) });
+    configurarDia({ data, nivel, arquivo, irPara: (d, n) => irPara(d, n), puzzle, conferencia, teclado });
 
     // Painel "Meu histórico" (estatísticas, calendário, backup), aberto no nível atual.
     iniciarHistorico({

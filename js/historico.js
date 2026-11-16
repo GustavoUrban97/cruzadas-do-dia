@@ -15,17 +15,19 @@ const ROTULOS = {
   'errei-algumas': 'Errei algumas',
   'nao-terminei': 'Não terminei',
   'terminei': 'Terminei (falta avaliar)',
-  'jogou': 'Jogou (falta avaliar)',
+  'jogou': 'Em andamento',
 };
 
 // ---------- Cálculo (funções puras) ----------
 
 /**
- * Estado de cada dia jogado num nível: avaliação, se houver; senão "terminei"
- * (marcou Terminei e não avaliou) ou "jogou" (só tem tinta ou letras digitadas). Dia sem nada = não jogou.
+ * Estado de cada dia jogado num nível: avaliação (automática na conferência,
+ * ou manual nos dias de antes dela), se houver; senão "terminei" (marcou o antigo
+ * Terminei e não avaliou) ou "jogou" (só tem tinta ou letras). Dia passado que
+ * ficou só com tinta, sem resolver, conta como "nao-terminei". Dia sem nada = não jogou.
  * Cada nível tem as suas estatísticas, como no Termo.
  */
-export function estadosDosDias({ tinta, registro }, nivel) {
+export function estadosDosDias({ tinta, registro }, nivel, hoje = null) {
   const estados = new Map();
   for (const t of tinta) {
     if (!t || t.nivel !== nivel || !dataValida(t.data)) continue;
@@ -37,6 +39,7 @@ export function estadosDosDias({ tinta, registro }, nivel) {
     if (r.avaliacao && ROTULOS[r.avaliacao]) estados.set(r.data, r.avaliacao);
     else if (r.terminei) estados.set(r.data, 'terminei');
   }
+  if (hoje) for (const [data, estado] of estados) if (estado === 'jogou' && data < hoje) estados.set(data, 'nao-terminei');
   return estados;
 }
 
@@ -97,8 +100,8 @@ export function iniciarHistorico({ hoje, nivel, antesDeLer, irPara, aoImportar }
   const mostrarAba = novaAba => {
     aba = novaAba;
     abas.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.abaNivel === aba)));
-    estados = estadosDosDias(dados, aba);
     const diaDeHoje = hoje();
+    estados = estadosDosDias(dados, aba, diaDeHoje);
     const datas = [...estados.keys()].filter(d => d <= diaDeHoje).sort();
     primeiroMes = (datas[0] || diaDeHoje).slice(0, 7);
     if (!mesVisto || mesVisto < primeiroMes) mesVisto = diaDeHoje.slice(0, 7);

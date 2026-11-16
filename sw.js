@@ -6,7 +6,7 @@
 // HTML, CSS ou JS. É a mudança deste arquivo que faz o tablet perceber
 // que existe versão nova e mostrar "Atualização disponível".
 
-const VERSAO = 'v15';
+const VERSAO = 'v16';
 const CACHE_CASCO = `casco-${VERSAO}`;
 const CACHE_PUZZLES = 'puzzles';
 
@@ -20,6 +20,10 @@ const CASCO = [
   'js/grade.js',
   'js/tinta.js',
   'js/teclado.js',
+  'js/conferencia.js',
+  'js/reconhecer.js',
+  'modelo/letras.json',
+  'modelo/letras.bin',
   'js/armazenamento.js',
   'js/diagnostico.js',
   'js/historico.js',

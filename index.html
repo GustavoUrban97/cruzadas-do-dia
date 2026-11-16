@@ -58,23 +58,30 @@
           <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5 M20 9H9.5a5.5 5.5 0 0 0 0 11H13" fill="none" stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </nav>
-      <button type="button" class="botao-texto" id="terminei" hidden aria-pressed="false">Terminei</button>
+      <button type="button" class="botao-texto" id="conferir" hidden aria-pressed="false">Conferir</button>
     </div>
   </header>
 
   <p class="aviso" id="aviso" hidden></p>
   <button type="button" class="faixa" id="atualizacao" hidden>Atualização disponível · toque para recarregar</button>
   <button type="button" class="faixa" id="novo-puzzle" hidden>Novo puzzle disponível · toque para abrir</button>
-  <button type="button" class="faixa faixa-clara" id="lembrete-ontem" hidden>Gabarito de ontem disponível · toque para avaliar</button>
+  <button type="button" class="faixa faixa-clara" id="lembrete-ontem" hidden>Ontem ficou sem conferir · toque para ver o gabarito</button>
 
-  <!-- Dias passados: avaliação do dia e gabarito -->
-  <div class="avaliacao" id="avaliacao" hidden>
-    <span class="avaliacao-rotulo">Como foi?</span>
-    <span class="avaliacao-opcoes" role="group" aria-label="Avaliação do dia">
-      <button type="button" class="botao-texto" data-avaliacao="acertei-tudo" aria-pressed="false">Acertei tudo</button>
-      <button type="button" class="botao-texto" data-avaliacao="errei-algumas" aria-pressed="false">Errei algumas</button>
-      <button type="button" class="botao-texto" data-avaliacao="nao-terminei" aria-pressed="false">Não terminei</button>
+  <!-- Hoje: resultado da conferência (sem mostrar respostas) -->
+  <div class="resultado" id="resultado" hidden>
+    <span class="resultado-texto" id="resultado-texto"></span>
+    <span class="resultado-botoes">
+      <button type="button" class="botao-texto" id="aceitar-ilegiveis" hidden>As ilegíveis estão certas</button>
+      <button type="button" class="botao-texto" id="desistir">Desistir</button>
+      <button type="button" class="botao-icone" id="fechar-resultado" title="Fechar" aria-label="Fechar">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12 M18 6L6 18" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
     </span>
+  </div>
+
+  <!-- Dias passados: como o dia terminou e o gabarito -->
+  <div class="avaliacao" id="avaliacao" hidden>
+    <span class="avaliacao-texto" id="avaliacao-texto"></span>
     <span class="resumo-letras" id="resumo-letras" hidden></span>
     <button type="button" class="botao-texto alternar-gabarito" id="alternar-gabarito">Ocultar gabarito</button>
   </div>
@@ -120,7 +127,7 @@
         <span><i class="estado-acertei-tudo"></i>Acertei tudo</span>
         <span><i class="estado-errei-algumas"></i>Errei algumas</span>
         <span><i class="estado-nao-terminei"></i>Não terminei</span>
-        <span><i class="estado-jogou"></i>Falta avaliar</span>
+        <span><i class="estado-jogou"></i>Em andamento</span>
       </div>
 
       <div class="backup">

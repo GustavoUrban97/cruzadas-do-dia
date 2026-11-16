@@ -17,9 +17,10 @@ Publicado no **GitHub Pages** (repositório público) e usado como **página com
 
 ## Princípio central: é papel, não formulário
 
-- O app **não reconhece** a escrita e **não valida** respostas durante o jogo. Ele só guarda os traços.
+- Enquanto eu escrevo, o app **não ajuda**: só guarda os traços. Ele só **confere quando eu peço** (botão **Conferir**), e mesmo assim não mostra a resposta: marca as casas erradas e as que não conseguiu ler.
 - A grade é uma folha onde se desenha livremente: letra no quadrado, palpite pequeno no canto, rabisco, riscar a dica resolvida na própria casa de dica.
-- Conferir é **como no jornal**: durante o dia não há ajuda nenhuma (**sem botão Revelar**). As respostas só aparecem no **gabarito de ontem**, no dia seguinte.
+- **Sem botão Revelar.** As respostas só aparecem se eu **desistir** (como o Termo mostra a palavra quando a gente perde) ou no **gabarito** dos dias passados.
+- A escrita à caneta é lida por um modelo de letras que roda no próprio aparelho (`js/reconhecer.js`, modelo em `modelo/`): como o app sabe a resposta de cada casa, ele só confere se a tinta parece a letra esperada. Só a **caneta** conta; o **lápis** é rascunho e nunca é conferido; o que está nas casas de dica (riscar a dica) é ignorado.
 
 ## Stack
 
@@ -43,6 +44,7 @@ js/datas.js        # "hoje" em America/Sao_Paulo, formatação
 js/diagnostico.js  # tela ?debug=1
 js/historico.js    # painel "Meu histórico": estatísticas, calendário, backup
 js/reconhecer.js   # reconhecimento das letras à caneta (modelo em modelo/), para conferir
+js/conferencia.js  # botão Conferir: leitura em segundo plano, marcas, resultado
 js/niveis.js       # os três níveis (fácil, média, difícil)
 puzzles/
   index.json       # lista de datas disponíveis (gerado pelo validador)
@@ -92,7 +94,7 @@ A caneta continua sendo a forma principal; o teclado é uma ferramenta a mais na
 - Letra digitada avança para a próxima casa vazia da palavra; ⌫ apaga a casa ou, se vazia, volta uma e apaga.
 - Retrato: o teclado fica embaixo da grade (a grade desconta a altura). Paisagem larga: fica ao lado (`--posicao: lado` no CSS faz `ajustarTamanho` descontar a largura).
 - As letras ficam por casa (`letras: {"linha,coluna": "A"}` no mesmo registro da tinta), em letra de forma, por baixo da tinta. Dá para misturar caneta e teclado no mesmo dia. A borracha passando no meio da casa apaga a letra; desfazer/refazer valem para traços e letras na mesma sequência.
-- Durante o dia nada é conferido. No **gabarito**, cada letra digitada certa ganha fundo verde claro e a errada fica riscada, com a certa pequena em verde no canto; aparece "Letras digitadas: X de Y certas". A avaliação do dia continua sendo minha.
+- Letras digitadas entram na conferência direto (comparação exata). No **gabarito**, cada letra digitada certa ganha fundo verde claro e a errada fica riscada, com a certa pequena em verde no canto; aparece "Letras digitadas: X de Y certas". 
 - **Celular** (tela com menos de 600 px, mesmo limite no CSS e em `js/app.js`): o modo teclado fica sempre ligado e as ferramentas de caneta (caneta, cores, lápis, borracha, botão Teclado) somem; a barra de escrita fica com Desfazer, Refazer e Terminei. Cabeçalho compacto: data curta ("sáb, 07/11"), sem número do puzzle/versão, barras podem quebrar linha em vez de cortar. Margem lateral de 6 px (o gesto de voltar só atrapalha a caneta). O texto das dicas dentro da grade fica minúsculo; a leitura é pela faixa (tocar na casa ou ◀ ▶). No gabarito, "Ocultar gabarito" vira "Ocultar". Deitado não tem layout especial.
 
 ## Layout
@@ -103,7 +105,7 @@ A caneta continua sendo a forma principal; o teclado é uma ferramenta a mais na
 - **Banco** (como no jornal): faixa fina embaixo da grade, à direita, com algumas palavras raras da própria grade escritas **de ponta-cabeça**, sempre visível. Fica fora da camada de tinta (não muda as coordenadas dos traços); a grade desconta a altura dela.
 - A camada de tinta cobre a grade inteira (casas de letra e de dica aceitam escrita).
 - Traços salvos em **coordenadas normalizadas** relativas à grade, para continuarem no lugar ao girar a tela ou redimensionar.
-- Cabeçalho em **duas barras**: em cima o dia (data por extenso, seletor **Fácil · Média · Difícil**, número do puzzle e versão discretos, Ontem/Hoje e o ícone do histórico); embaixo a escrita (caneta e cores, lápis, borracha, teclado, desfazer, refazer) e o **Terminei** à direita. Em retrato a grade é limitada pela largura, então a segunda barra não a diminui. Tudo precisa caber em ~600 px de largura (o ano da data some abaixo de 760 px); abaixo de 600 px vale o layout de celular (ver Modo teclado).
+- Cabeçalho em **duas barras**: em cima o dia (data por extenso, seletor **Fácil · Média · Difícil**, número do puzzle e versão discretos, Ontem/Hoje e o ícone do histórico); embaixo a escrita (caneta e cores, lápis, borracha, teclado, desfazer, refazer) e o **Conferir** à direita. Em retrato a grade é limitada pela largura, então a segunda barra não a diminui. Tudo precisa caber em ~600 px de largura (o ano da data some abaixo de 760 px); abaixo de 600 px vale o layout de celular (ver Modo teclado).
 - Sem rolagem acidental nem zoom do navegador ao escrever (`user-scalable=no` no viewport é aceitável aqui).
 - Margem lateral de ~24px em volta da grade: no Tab S9 com navegação por gestos, escrever colado na borda dispara o "voltar" do Android. Além disso, depois de cada traço o app arma uma entrada extra no histórico, para o primeiro gesto de voltar acidental não sair da página (o Chrome só respeita `pushState` feito logo após uma ação do usuário, por isso é rearmado no fim do traço).
 
@@ -124,12 +126,13 @@ A caneta continua sendo a forma principal; o teclado é uma ferramenta a mais na
 
 ## Gabarito, registro do dia e histórico
 
-Como no jornal, sem ajuda durante o dia:
+Sem ajuda enquanto escrevo; conferir só quando eu peço:
 
-- **Hoje:** só a folha. Um botão discreto **"Terminei"** registra que concluí naquele dia (opcional); tocar de novo desfaz. Botão "Ontem" abre o gabarito de ontem, e um lembrete aparece se ontem foi jogado e ainda não avaliado.
-- **Gabarito de ontem:** mostra a grade de ontem com a minha tinta e as respostas sobrepostas **em verde, levemente transparente** (verde para não confundir com nenhuma das cores de caneta). Ali eu avalio o dia: **Acertei tudo**, **Errei algumas** ou **Não terminei** (pode trocar depois). As letras verdes ficam por baixo da tinta e podem ser ocultadas. Qualquer dia passado abre assim; dia futuro nunca mostra respostas.
+- **Hoje:** a folha e o botão **Conferir**. O app lê em segundo plano cada casa logo depois de cada traço (uns 16 ms por casa), então conferir é imediato. Tudo certo → "Tudo certo! 🎉" e o dia fica **resolvido**. Senão, marca as casas **erradas** (círculo laranja) e as que **não conseguiu ler** (contorno cinza tracejado), sem mostrar a resposta, e uma faixa diz quantas estão erradas, ilegíveis e vazias, com **"As ilegíveis estão certas"** (o reconhecimento falhou: contam como certas) e **"Desistir"** (mostra as respostas na hora). Reescrever uma casa tira a marca dela. Botão "Ontem" abre o gabarito de ontem, e um lembrete aparece se ontem foi escrito e ficou sem conferir.
+- **Registro automático:** resolveu na 1ª conferência = **acertei tudo**; resolveu depois de corrigir = **errei algumas**; desistiu, ou o dia passou sem resolver = **não terminei**. Registro: `conferencias`, `resolvido`, `desistiu` e a `avaliacao` correspondente (os dias avaliados à mão antes disso continuam como estão).
+- **Dias passados (gabarito):** a grade com a minha tinta e as respostas sobrepostas **em verde, levemente transparente** (verde para não confundir com nenhuma das cores de caneta), as casas erradas marcadas em laranja e uma faixa dizendo como o dia terminou ("Resolvida na 2ª conferência", "Desisti", "Ficou sem conferir"). As letras verdes ficam por baixo da tinta e podem ser ocultadas. Dia futuro nunca mostra respostas.
 - Dia em que nem abri a página: **não jogou**.
-- **Sequência** (por nível): dias seguidos em que **terminei** o puzzle (acertando tudo ou errando algumas). "Não terminei" e "não jogou" quebram a sequência, assim como dia jogado sem "Terminei" nem avaliação. "Terminei" ainda sem avaliação conta. Hoje em andamento não quebra.
+- **Sequência** (por nível): dias seguidos em que **terminei** o puzzle (acertando tudo ou errando algumas). "Não terminei" e "não jogou" quebram a sequência, assim como dia passado escrito e não resolvido. "Terminei" sem avaliação (dos dias de antes da conferência) conta. Hoje em andamento não quebra.
 - **Estatísticas** no estilo do Termo: dias jogados, % de "acertei tudo", sequência atual e melhor sequência, distribuição entre acertei tudo / errei algumas / não terminei. A % é sobre os dias avaliados. Fica no painel "Meu histórico" (ícone de gráfico no cabeçalho), com uma aba por nível: cada nível tem estatísticas, sequência e calendário próprios, como no Termo.
 - **Histórico:** calendário dos dias com a cor de cada um; tocar abre o puzzle daquele dia com a minha tinta e o gabarito. Dias passados continuam editáveis, mas editar não altera o registro já marcado.
 - **Backup:** exportar toda a tinta e o registro dos dias como um arquivo JSON e importar de volta (troca de tablet ou dados do Chrome apagados). Formato 3 (cada entrada com `nivel` e, se houver, `letras`); backups nos formatos 2 e 1 continuam entrando; um backup no formato 1, de antes dos níveis, entra como "Média". Importar substitui, neste aparelho, os puzzles que estão no arquivo; os outros ficam.
@@ -196,7 +199,7 @@ Fora do app (não entram no service worker):
 8. **Conteúdo:** gerador em `tools/gerador.html` (o Python ficou só no validador) e um banco inicial de 30 dias × 3 níveis, em 3 lotes de 10 dias.
 9. **Modo teclado:** ferramenta Teclado, teclado próprio estilo Termo, faixa da dica atual, letras salvas com a tinta, conferência das letras digitadas no gabarito, backup formato 3. ✔
 10. **Celular:** layout para tela estreita (S24) só com o modo teclado, cabeçalho compacto, ◀ ▶ na faixa da dica. ✔
-11. **Conferir a caneta (em andamento):** modelo de letras treinado no EMNIST Letters (GitHub Actions, rede pequena, ~94,7% no teste), `js/reconhecer.js` (traços da casa → imagem 28×28 como o EMNIST → rede em JS puro; certa / errada / ilegível sabendo a letra esperada; só caneta conta, lápis é rascunho) e a página de teste `tools/reconhecer.html`. Fase 2, se o teste no tablet for bom: o Terminei confere no dia (marca erradas e ilegíveis sem mostrar a resposta), estatísticas automáticas, gabarito só para quem desistiu — muda o princípio "não reconhece a escrita".
+11. **Conferir a caneta:** modelo de letras treinado no EMNIST Letters (GitHub Actions, rede pequena, ~94,7% no teste, 266 KB em float16, no cache offline), `js/reconhecer.js` (traços da casa → imagem 28×28 como o EMNIST → rede em JS puro; certa / errada / ilegível sabendo a letra esperada), página de teste `tools/reconhecer.html` e `js/conferencia.js` (leitura em segundo plano, botão Conferir, marcas, Desistir, registro automático). ✔
 
 ## Critérios de aceite
 
@@ -210,4 +213,4 @@ Fora do app (não entram no service worker):
 
 ## Fora do escopo (por enquanto)
 
-App instalável (PWA), botão Revelar, reconhecimento de escrita, zoom na grade, celular deitado, sincronização entre aparelhos, contas, compartilhamento de resultado.
+App instalável (PWA), botão Revelar, zoom na grade, celular deitado, sincronização entre aparelhos, contas, compartilhamento de resultado.

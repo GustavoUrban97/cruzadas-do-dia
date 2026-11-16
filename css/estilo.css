@@ -725,3 +725,39 @@ body {
   .sem-celular { display: none; }
   .avaliacao .botao-texto { height: 30px; padding: 0 0.45rem; font-size: 0.75rem; }
 }
+
+/* ---------- Conferência (botão Conferir) ---------- */
+
+/* Marcas na grade, sem mostrar a resposta. Laranja para não confundir com a
+   caneta vermelha nem com o verde do gabarito. Ficam por baixo da tinta. */
+.casa.marca-errada::after,
+.casa.marca-ilegivel::after {
+  content: "";
+  position: absolute;
+  inset: 10%;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.casa.marca-errada::after { border: 2.5px solid #e0782a; }
+.casa.marca-ilegivel::after { border: 2px dashed #8a867e; border-radius: 8px; }
+
+/* Faixa com o resultado da conferência */
+.resultado {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.6rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.75rem;
+  border-bottom: 1px solid #d8d0bd;
+  background: #fbeee3;
+}
+.resultado[hidden] { display: none; }
+.resultado-texto { font-size: 0.9rem; font-weight: 700; color: #a8521a; }
+.resultado-botoes { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.resultado .botao-texto { height: 30px; font-size: 0.78rem; }
+.resultado .botao-icone { width: 32px; height: 30px; }
+.resultado .botao-icone svg { width: 18px; height: 18px; }
+
+#conferir:disabled { cursor: default; }
+#conferir[aria-pressed="true"]:disabled { opacity: 1; }
+.avaliacao-texto { font-size: 0.85rem; font-weight: 700; }
