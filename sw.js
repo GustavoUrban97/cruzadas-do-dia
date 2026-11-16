@@ -6,7 +6,7 @@
 // HTML, CSS ou JS. É a mudança deste arquivo que faz o tablet perceber
 // que existe versão nova e mostrar "Atualização disponível".
 
-const VERSAO = 'v14';
+const VERSAO = 'v15';
 const CACHE_CASCO = `casco-${VERSAO}`;
 const CACHE_PUZZLES = 'puzzles';
 
@@ -63,7 +63,10 @@ self.addEventListener('fetch', evento => {
     return;
   }
 
-  // Página (com qualquer ?data=, ?debug=...): sempre o index.html guardado.
+  // Página do jogo (com qualquer ?data=, ?debug=...): sempre o index.html guardado.
+  // Outras páginas do site (tools/gerador.html, tools/reconhecer.html) vêm da rede.
+  const raiz = new URL('./', self.location).pathname;
+  if (pedido.mode === 'navigate' && url.pathname !== raiz && url.pathname !== `${raiz}index.html`) return;
   if (pedido.mode === 'navigate') {
     evento.respondWith(
       caches.match('index.html', { cacheName: CACHE_CASCO }).then(r => r || fetch(pedido))

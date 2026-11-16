@@ -12,7 +12,7 @@ import { carregarTinta, salvarTinta, pedirPersistencia, carregarRegistro, atuali
 // Versão do app, mostrada discretamente no cabeçalho.
 // IMPORTANTE: precisa ser igual à VERSAO de sw.js, que deve subir a cada mudança
 // em HTML/CSS/JS (é o que faz o tablet perceber que há versão nova).
-const VERSAO = 14;
+const VERSAO = 15;
 
 // Celular (tela estreita): sem caneta, o jogo é só pelo modo teclado.
 // O mesmo limite está no CSS (@media max-width: 599px).
