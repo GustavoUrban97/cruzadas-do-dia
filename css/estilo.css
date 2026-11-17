@@ -266,6 +266,8 @@ body {
 .dist-linha { display: grid; grid-template-columns: 7.5rem 1fr; align-items: center; gap: 0.5rem; }
 .dist-rotulo { font-size: 0.85rem; }
 .dist-trilho { display: block; }
+.dist-linha.hoje .dist-rotulo { font-weight: 700; }
+.dist-linha.hoje .dist-barra { outline: 2px solid var(--tinta); outline-offset: 1px; }
 .dist-barra {
   display: block;
   min-width: 1.6rem;
@@ -741,6 +743,19 @@ body {
 }
 .casa.marca-errada::after { border: 2.5px solid #e0782a; }
 .casa.marca-ilegivel::after { border: 2px dashed #8a867e; border-radius: 8px; }
+/* Casa que ficou vazia (Conferir com a grade incompleta): um pontinho no meio. */
+.casa.marca-vazia::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #d9a400;
+  pointer-events: none;
+}
 
 /* Faixa com o resultado da conferência */
 .resultado {

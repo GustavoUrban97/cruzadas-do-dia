@@ -43,16 +43,64 @@ export function estadosDosDias({ tinta, registro }, nivel, hoje = null) {
   return estados;
 }
 
-const terminou = estado => estado === 'acertei-tudo' || estado === 'errei-algumas' || estado === 'terminei';
+/**
+ * Em quantas conferências cada dia resolvido de um nível foi resolvido
+ * (registro.conferencias, gravado desde o botão Conferir).
+ */
+export function conferenciasDosDias(registro, nivel) {
+  const mapa = new Map();
+  for (const r of registro) {
+    if (!r || r.nivel !== nivel || !dataValida(r.data) || !r.resolvido) continue;
+    const n = Number(r.conferencias);
+    if (Number.isInteger(n) && n >= 1) mapa.set(r.data, n);
+  }
+  return mapa;
+}
+
+// Barras da distribuição, como no Termo (em quantas tentativas). A de "sem
+// contagem" (dias avaliados à mão antes do Conferir) só aparece se tiver algum.
+const BARRAS = [
+  { chave: '1', rotulo: '1ª conferência', cor: 'acertei-tudo' },
+  { chave: '2', rotulo: '2ª conferência', cor: 'errei-algumas' },
+  { chave: '3', rotulo: '3ª conferência', cor: 'errei-algumas' },
+  { chave: '4+', rotulo: '4ª ou mais', cor: 'errei-algumas' },
+  { chave: 'sem-contagem', rotulo: 'Errei (sem contagem)', cor: 'errei-algumas', opcional: true },
+  { chave: 'nao-terminei', rotulo: 'Não terminei', cor: 'nao-terminei' },
+];
+
+/** Em qual barra da distribuição o dia entra (ou null, se ainda não terminou). */
+function barraDoDia(estado, n) {
+  if (estado === 'acertei-tudo') return '1';
+  if (estado === 'nao-terminei') return 'nao-terminei';
+  if (estado !== 'errei-algumas') return null;
+  if (!n || n < 2) return 'sem-contagem';
+  return n >= 4 ? '4+' : String(n);
+}
+
+/** Texto do dia no calendário. */
+function rotuloDoDia(estado, n) {
+  if (!estado) return 'não jogou';
+  if ((estado === 'acertei-tudo' || estado === 'errei-algumas') && n) return `resolvida na ${n}ª conferência`;
+  return ROTULOS[estado].toLowerCase();
+}
+
+const terminou = estado =>estado === 'acertei-tudo' || estado === 'errei-algumas' || estado === 'terminei';
 
 /** Números do painel. Só contam dias até hoje. */
-export function calcularEstatisticas(estados, hoje) {
+export function calcularEstatisticas(estados, hoje, conferencias = new Map()) {
   const dias = [...estados.keys()].filter(d => d <= hoje).sort();
   const contagem = { 'acertei-tudo': 0, 'errei-algumas': 0, 'nao-terminei': 0 };
+  const porBarra = Object.fromEntries(BARRAS.map(b => [b.chave, 0]));
   for (const d of dias) {
     const e = estados.get(d);
     if (e in contagem) contagem[e]++;
+    const barra = barraDoDia(e, conferencias.get(d));
+    if (barra) porBarra[barra]++;
   }
+  const distribuicao = BARRAS
+    .filter(b => !b.opcional || porBarra[b.chave] > 0)
+    .map(b => ({ ...b, quantidade: porBarra[b.chave] }));
+  const barraDeHoje = barraDoDia(estados.get(hoje), conferencias.get(hoje));
   const avaliados = contagem['acertei-tudo'] + contagem['errei-algumas'] + contagem['nao-terminei'];
 
   // Sequência atual: para trás a partir de hoje; hoje ainda em andamento não quebra.
@@ -75,6 +123,8 @@ export function calcularEstatisticas(estados, hoje) {
     atual,
     melhor: Math.max(melhor, atual),
     contagem,
+    distribuicao,
+    barraDeHoje,
   };
 }
 
@@ -95,6 +145,7 @@ export function iniciarHistorico({ hoje, nivel, antesDeLer, irPara, aoImportar }
   let dados = { tinta: [], registro: [] };
   let mesVisto = null;   // 'AAAA-MM'
   let estados = new Map();
+  let conferencias = new Map(); // data -> em quantas conferências resolveu
   let primeiroMes = null;
 
   const mostrarAba = novaAba => {
@@ -102,10 +153,11 @@ export function iniciarHistorico({ hoje, nivel, antesDeLer, irPara, aoImportar }
     abas.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.abaNivel === aba)));
     const diaDeHoje = hoje();
     estados = estadosDosDias(dados, aba, diaDeHoje);
+    conferencias = conferenciasDosDias(dados.registro, aba);
     const datas = [...estados.keys()].filter(d => d <= diaDeHoje).sort();
     primeiroMes = (datas[0] || diaDeHoje).slice(0, 7);
     if (!mesVisto || mesVisto < primeiroMes) mesVisto = diaDeHoje.slice(0, 7);
-    desenharEstatisticas(calcularEstatisticas(estados, diaDeHoje));
+    desenharEstatisticas(calcularEstatisticas(estados, diaDeHoje, conferencias));
     desenharCalendario();
   };
 
@@ -158,7 +210,7 @@ export function iniciarHistorico({ hoje, nivel, antesDeLer, irPara, aoImportar }
       if (dia > diaDeHoje) {
         botao.disabled = true;
       } else {
-        botao.title = `${dataCurta(dia)} (${NOMES_NIVEIS[aba]}): ${estado ? ROTULOS[estado] : "não jogou"}`;
+        botao.title = `${dataCurta(dia)} (${NOMES_NIVEIS[aba]}): ${rotuloDoDia(estado, conferencias.get(dia))}`;
         const destino = dia;
         botao.addEventListener('click', () => { painel.close(); irPara(destino, aba); });
       }
@@ -214,25 +266,26 @@ export function iniciarHistorico({ hoje, nivel, antesDeLer, irPara, aoImportar }
   });
 }
 
-function desenharEstatisticas({ jogados, porcentagem, atual, melhor, contagem }) {
+function desenharEstatisticas({ jogados, porcentagem, atual, melhor, distribuicao, barraDeHoje }) {
   $('est-jogados').textContent = jogados;
   $('est-porcentagem').textContent = porcentagem;
   $('est-atual').textContent = atual;
   $('est-melhor').textContent = melhor;
 
-  const maior = Math.max(1, ...Object.values(contagem));
+  const maior = Math.max(1, ...distribuicao.map(b => b.quantidade));
   const lista = $('distribuicao');
   lista.replaceChildren();
-  for (const [chave, quantidade] of Object.entries(contagem)) {
+  for (const { chave, rotulo: texto, cor, quantidade } of distribuicao) {
     const linha = document.createElement('div');
     linha.className = 'dist-linha';
+    if (chave === barraDeHoje) linha.classList.add('hoje'); // o dia de hoje, como no Termo
     const rotulo = document.createElement('span');
     rotulo.className = 'dist-rotulo';
-    rotulo.textContent = ROTULOS[chave];
+    rotulo.textContent = texto;
     const trilho = document.createElement('span');
     trilho.className = 'dist-trilho';
     const barra = document.createElement('span');
-    barra.className = `dist-barra estado-${chave}`;
+    barra.className = `dist-barra estado-${cor}`;
     barra.style.width = `${Math.max(8, (quantidade / maior) * 100)}%`;
     barra.textContent = quantidade;
     trilho.append(barra);

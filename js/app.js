@@ -13,7 +13,7 @@ import { carregarTinta, salvarTinta, pedirPersistencia, carregarRegistro, atuali
 // Versão do app, mostrada discretamente no cabeçalho.
 // IMPORTANTE: precisa ser igual à VERSAO de sw.js, que deve subir a cada mudança
 // em HTML/CSS/JS (é o que faz o tablet perceber que há versão nova).
-const VERSAO = 18;
+const VERSAO = 19;
 
 // Celular (tela estreita): sem caneta, o jogo é só pelo modo teclado.
 // O mesmo limite está no CSS (@media max-width: 599px).
@@ -266,8 +266,9 @@ const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 
 /**
  * Mostra as ações que fazem sentido para o puzzle aberto (data + nível):
- *  - hoje: "Conferir" (marca erradas e ilegíveis sem mostrar a resposta; tudo certo
- *    resolve o dia), "Desistir" (mostra as respostas) e "Ontem";
+ *  - hoje: "Conferir" (com a grade completa, marca erradas e ilegíveis sem mostrar a
+ *    resposta e conta uma tentativa; tudo certo resolve o dia; com casas vazias, só
+ *    aponta as vazias e não conta), "Desistir" (mostra as respostas) e "Ontem";
  *  - dia passado: gabarito em verde, as casas erradas marcadas e como o dia terminou;
  *  - dia futuro (só em teste): apenas "Hoje".
  * O registro é automático: resolveu na 1ª conferência = acertei tudo; depois de
@@ -358,11 +359,10 @@ async function configurarDia({ data, nivel, arquivo, irPara, puzzle, conferencia
     };
 
     const mostrarResultado = () => {
-      const { erradas, ilegiveis, vazias } = ultimo;
+      const { erradas, ilegiveis } = ultimo;
       const partes = [];
       if (erradas.length) partes.push(plural(erradas.length, 'errada', 'erradas'));
       if (ilegiveis.length) partes.push(`${plural(ilegiveis.length, 'casa', 'casas')} que não consegui ler`);
-      if (vazias.length) partes.push(plural(vazias.length, 'vazia', 'vazias'));
       $('resultado-texto').textContent = partes.join(' · ');
       $('aceitar-ilegiveis').hidden = ilegiveis.length === 0;
       faixa.hidden = false;
@@ -380,9 +380,19 @@ async function configurarDia({ data, nivel, arquivo, irPara, puzzle, conferencia
         pintar();
         return;
       }
+      // Grade incompleta: não confere nada nem gasta tentativa; só aponta as vazias.
+      if (ultimo.vazias.length) {
+        conferencia.marcar({ vazias: ultimo.vazias });
+        $('resultado-texto').textContent =
+          `${ultimo.vazias.length === 1 ? 'Falta 1 casa' : `Faltam ${ultimo.vazias.length} casas`} · o lápis não conta`;
+        $('aceitar-ilegiveis').hidden = true;
+        faixa.hidden = false;
+        pintar();
+        return;
+      }
       const ok = await gravar({ conferencias: ((registro && registro.conferencias) || 0) + 1 });
       if (!ok) { pintar(); return; }
-      if (!ultimo.erradas.length && !ultimo.ilegiveis.length && !ultimo.vazias.length) {
+      if (!ultimo.erradas.length && !ultimo.ilegiveis.length) {
         await resolver();
       } else {
         conferencia.marcar(ultimo);

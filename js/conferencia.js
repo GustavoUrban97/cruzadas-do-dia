@@ -8,6 +8,8 @@
 
 import { carregarModelo, conferirCasa, tracosPorCasa } from './reconhecer.js';
 
+const MARCAS = ['marca-errada', 'marca-ilegivel', 'marca-vazia'];
+
 export class Conferencia {
   /**
    * @param {object} opcoes
@@ -129,18 +131,19 @@ export class Conferencia {
     for (const chave of chaves) { this.aceitas.add(chave); this.desmarcar(chave); }
   }
 
-  marcar({ erradas, ilegiveis }) {
+  marcar({ erradas = [], ilegiveis = [], vazias = [] }) {
     this.limparMarcas();
     for (const chave of erradas) this.casas.get(chave)?.classList.add('marca-errada');
     for (const chave of ilegiveis) this.casas.get(chave)?.classList.add('marca-ilegivel');
+    for (const chave of vazias) this.casas.get(chave)?.classList.add('marca-vazia');
   }
 
   desmarcar(chave) {
-    this.casas.get(chave)?.classList.remove('marca-errada', 'marca-ilegivel');
+    this.casas.get(chave)?.classList.remove(...MARCAS);
   }
 
   limparMarcas() {
-    for (const casa of this.casas.values()) casa.classList.remove('marca-errada', 'marca-ilegivel');
+    for (const casa of this.casas.values()) casa.classList.remove(...MARCAS);
   }
 }
 
