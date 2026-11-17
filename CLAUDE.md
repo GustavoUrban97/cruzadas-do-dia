@@ -107,7 +107,7 @@ A caneta continua sendo a forma principal; o teclado é uma ferramenta a mais na
 - Traços salvos em **coordenadas normalizadas** relativas à grade, para continuarem no lugar ao girar a tela ou redimensionar.
 - Cabeçalho em **duas barras**: em cima o dia (data por extenso, seletor **Fácil · Média · Difícil**, número do puzzle e versão discretos, Ontem/Hoje e o ícone do histórico); embaixo a escrita (caneta e cores, lápis, borracha, teclado, desfazer, refazer) e o **Conferir** à direita. Em retrato a grade é limitada pela largura, então a segunda barra não a diminui. Tudo precisa caber em ~600 px de largura (o ano da data some abaixo de 760 px); abaixo de 600 px vale o layout de celular (ver Modo teclado).
 - Sem rolagem acidental nem zoom do navegador ao escrever (`user-scalable=no` no viewport é aceitável aqui).
-- Margem lateral de ~24px em volta da grade: no Tab S9 com navegação por gestos, escrever colado na borda dispara o "voltar" do Android. Além disso, depois de cada traço o app arma uma entrada extra no histórico, para o primeiro gesto de voltar acidental não sair da página (o Chrome só respeita `pushState` feito logo após uma ação do usuário, por isso é rearmado no fim do traço).
+- Margem lateral de ~24px em volta da grade: no Tab S9 com navegação por gestos, escrever colado na borda dispara o "voltar" do Android. Embaixo, 32px (mais a área segura): o canto de baixo da grade caía na zona do gesto do assistente e a caneta não escrevia ali. Além disso, depois de cada traço o app arma uma entrada extra no histórico, para o primeiro gesto de voltar acidental não sair da página (o Chrome só respeita `pushState` feito logo após uma ação do usuário, por isso é rearmado no fim do traço).
 
 ## Ciclo diário
 

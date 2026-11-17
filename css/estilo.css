@@ -397,8 +397,9 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* margem lateral maior: tira a grade da faixa do gesto de voltar do Android */
-  padding: 0.5rem 24px;
+  /* margem lateral maior: tira a grade da faixa do gesto de voltar do Android;
+     embaixo, tira o canto da grade da zona do gesto do assistente (cantos de baixo) */
+  padding: 0.5rem 24px calc(32px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ---------- Papel + camada de tinta ---------- */
