@@ -26,12 +26,12 @@ export const MAX_CURTA = 4; // até 4 letras: "cola" da grade, pode repetir, mas
  *  - rand: sorteio (com semente) para variar a ordem das curtas.
  * Numerais e ordinais nunca entram.
  * Palavras de 2–3 letras vêm de uma lista escolhida a dedo (palavras.js); no fácil
- * entram as que estão entre as 4.500 mais comuns; na média e no difícil, todas.
+ * entram as que estão entre as 5.500 mais comuns; na média e no difícil, todas.
  */
 export function listaDoNivel(base, nivel, evitar = new Set(), { usos = null, rand = Math.random } = {}) {
   const fora = p => p.length >= 5 && evitar.has(p);
   let lista;
-  if (nivel === 'facil') lista = base.slice(0, 4500).filter(p => !fora(p));
+  if (nivel === 'facil') lista = base.slice(0, 5500).filter(p => !fora(p));
   else if (nivel === 'media') lista = base.slice(0, 7500).filter(p => !fora(p));
   // difícil: as menos usuais primeiro (faixa 1.500–7.500), as comuns como reserva
   else lista = [...base.slice(1500, 7500), ...base.slice(0, 1500)].filter(p => !fora(p));
