@@ -3,6 +3,9 @@
 // dica com seta para o seu início; toda casa de dica tem ao menos uma dica.
 
 export const L = 13, A = 17;
+// Quanto a folga nas cruzadas pesa contra a preferência da lista ao escolher a palavra.
+export let PESO_FOLGA = 3;
+export const pesoFolga = v => { PESO_FOLGA = v; };
 
 /** Gerador pseudoaleatório com semente (mulberry32): mesma semente, mesmo puzzle. */
 export function rng(semente) {
@@ -74,15 +77,17 @@ export function atribuirDicas(g) {
 
 /** "Feiura" do esqueleto; 0 = pronto. */
 function custo(g, perfil) {
-  let s = 0, duas = 0;
+  let s = 0, duas = 0, tres = 0;
   const contagem = Array.from({ length: A }, () => Array(L).fill(0)); // em quantas palavras cada letra está
   for (const seq of sequencias(g)) {
     const n = seq.casas.length;
     if (n > perfil.maxLetras) s += (n - perfil.maxLetras) * 2;
     if (n === 2) duas++;
+    if (n === 3) tres++;
     if (n >= 2) for (const [r, c] of seq.casas) contagem[r][c]++;
   }
   if (duas > perfil.maxDuas) s += duas - perfil.maxDuas;
+  if (tres > (perfil.maxTres ?? Infinity)) s += tres - perfil.maxTres;
   let dicas = 0, simples = 0;
   for (let r = 0; r < A; r++) for (let c = 0; c < L; c++) {
     if (!g[r][c]) {
@@ -107,14 +112,14 @@ function custo(g, perfil) {
  * Sorteia um esqueleto: bordas e miolo aleatórios, ajustados por recozimento
  * simulado até o custo zerar. Devolve null se não convergir.
  */
-export function gerarEsqueleto(rand, perfil, passos = 40000) {
-  const g = Array.from({ length: A }, (_, r) => Array.from({ length: L }, (_, c) =>
+export function gerarEsqueleto(rand, perfil, passos = 40000, inicial = null, travadas = null, temp0 = 2) {
+  const g = inicial ? inicial.map(l => l.slice()) : Array.from({ length: A }, (_, r) => Array.from({ length: L }, (_, c) =>
     (r === 0 && c === 0) || ((r === 0 || c === 0) && rand() < 0.55) || (r > 0 && c > 0 && rand() < perfil.densidade)));
   const todas = [];
-  for (let r = 0; r < A; r++) for (let c = 0; c < L; c++) if (r || c) todas.push([r, c]);
+  for (let r = 0; r < A; r++) for (let c = 0; c < L; c++) if ((r || c) && !(travadas && travadas.has(r * L + c))) todas.push([r, c]);
   const bordas = todas.filter(([r, c]) => r === 0 || c === 0);
   let atual = custo(g, perfil);
-  let temp = 2;
+  let temp = temp0;
   for (let p = 0; p < passos && atual > 0; p++) {
     const fonte = rand() < 0.15 ? bordas : todas;
     const [r, c] = fonte[Math.floor(rand() * fonte.length)];
@@ -133,66 +138,164 @@ export function gerarEsqueleto(rand, perfil, passos = 40000) {
  */
 export function preencher(g, palavras, rand, limiteNos = 80000, inicial = null) {
   const vagas = sequencias(g).filter(s => s.casas.length >= 2);
-  const porTamanho = {};
-  palavras.forEach((p, i) => { (porTamanho[p.length] ||= []).push(i); });
+  const ind = indexar(palavras);
   // inicial: letras já fixas (conserto local); vagas completas não mudam
   const atual = inicial ? inicial.map(l => l.slice()) : Array.from({ length: A }, () => Array(L).fill(''));
-  const usadas = new Set();
   const atribuida = new Array(vagas.length).fill(-1);
   let fixas = 0;
   vagas.forEach((v, i) => {
     const p = v.casas.map(([r, c]) => atual[r][c]).join('');
-    if (p.length === v.casas.length) { atribuida[i] = -2; usadas.add(p); fixas++; }
+    if (p.length === v.casas.length) { atribuida[i] = -2; ind.bloquear(p, +1); fixas++; }
   });
-  const vagasDaCasa = {};
-  vagas.forEach((v, i) => v.casas.forEach(([r, c]) => (vagasDaCasa[r + ',' + c] ||= []).push(i)));
 
-  const candidatas = (i, limite = Infinity) => {
-    const padrao = vagas[i].casas.map(([r, c]) => atual[r][c]);
-    const out = [];
-    for (const id of porTamanho[padrao.length] || []) {
-      const p = palavras[id];
-      if (usadas.has(p)) continue;
-      let ok = true;
-      for (let k = 0; k < padrao.length; k++) if (padrao[k] && padrao[k] !== p[k]) { ok = false; break; }
-      if (ok) { out.push(id); if (out.length >= limite) break; }
+  /** Bitset das palavras que cabem na vaga (tamanho certo, letras já postas, ainda livres). */
+  const mascara = i => {
+    const casas = vagas[i].casas, t = ind.porTamanho[casas.length];
+    if (!t) return null;
+    const m = t.livres.slice();
+    for (let k = 0; k < casas.length; k++) {
+      const ch = atual[casas[k][0]][casas[k][1]];
+      if (!ch) continue;
+      const b = t.bits[k][ch.charCodeAt(0) - 65];
+      for (let x = 0; x < m.length; x++) m[x] &= b[x];
     }
-    return out;
+    return m;
   };
 
-  let nos = 0;
+  // cruzada[i][casa] = a outra vaga que passa por aquela casa da vaga i
+  const daCasa = {};
+  vagas.forEach((v, i) => v.casas.forEach(([r, c]) => (daCasa[r * L + c] ||= []).push(i)));
+  const cruzada = vagas.map((v, i) => {
+    const m = {};
+    v.casas.forEach(([r, c]) => { const o = daCasa[r * L + c].find(j => j !== i); if (o !== undefined) m[r * L + c] = o; });
+    return m;
+  });
+
+  // falhas[i]: quantas vezes a vaga i ficou sem opção (onde a grade trava)
+  const falhas = new Array(vagas.length).fill(0);
+  let nos = 0, menor = Infinity;
   const buscar = restantes => {
+    if (restantes < menor) menor = restantes;
     if (restantes === 0) return true;
     if (++nos > limiteNos) return false;
-    let melhor = -1, menos = Infinity;
+    // a vaga com menos opções primeiro (se alguma ficou sem opção, volta)
+    let melhor = -1, menos = Infinity, mMelhor = null;
     for (let i = 0; i < vagas.length; i++) {
       if (atribuida[i] !== -1) continue;
-      const n = candidatas(i, menos).length;
-      if (n < menos) { menos = n; melhor = i; if (n === 0) return false; }
+      const m = mascara(i);
+      const n = m ? contar(m) : 0;
+      if (n < menos) { menos = n; melhor = i; mMelhor = m; if (n === 0) { falhas[i]++; return false; } }
     }
-    // as primeiras da lista têm preferência, com um pouco de sorte
-    const ordem = candidatas(melhor).map((id, k) => [id, k * (0.3 + rand())])
-      .sort((a, b) => a[1] - b[1]).map(x => x[0]).slice(0, 40);
+    // Candidatas: as primeiras da lista têm preferência (com um pouco de sorte),
+    // mas cada uma é testada antes — as que deixam uma vaga cruzada sem opção
+    // saem, e as que deixam mais opções nas cruzadas sobem na fila.
+    const t = ind.porTamanho[vagas[melhor].casas.length];
+    const casas = vagas[melhor].casas;
+    const avaliadas = [];
+    bitsLigados(mMelhor, 60).forEach((j, k) => {
+      const id = t.ids[j], p = palavras[id];
+      const novas = [];
+      casas.forEach(([r, c], q) => { if (!atual[r][c]) { atual[r][c] = p[q]; novas.push([r, c]); } });
+      ind.bloquear(p, +1);
+      let folga = 0;
+      for (const [r, c] of novas) {
+        const j2 = cruzada[melhor][r * L + c];
+        if (j2 === undefined || atribuida[j2] !== -1) continue;
+        const n = contar(mascara(j2));
+        if (n === 0) { folga = -1; break; }
+        folga += Math.log(n + 1);
+      }
+      ind.bloquear(p, -1);
+      for (const [r, c] of novas) atual[r][c] = '';
+      if (folga >= 0) avaliadas.push([id, k * (0.3 + rand()) - PESO_FOLGA * folga]);
+    });
+    if (!avaliadas.length) falhas[melhor]++;
+    const ordem = avaliadas.sort((a, b) => a[1] - b[1]).map(x => x[0]).slice(0, 12);
     for (const id of ordem) {
       const p = palavras[id];
       const novas = [];
-      vagas[melhor].casas.forEach(([r, c], k) => { if (!atual[r][c]) { atual[r][c] = p[k]; novas.push([r, c]); } });
-      usadas.add(p); atribuida[melhor] = id;
-      let viva = true; // checagem adiante: as vagas cruzadas ainda têm opção?
-      for (const [r, c] of novas) {
-        for (const j of vagasDaCasa[r + ',' + c]) {
-          if (j !== melhor && atribuida[j] === -1 && candidatas(j, 1).length === 0) { viva = false; break; }
-        }
-        if (!viva) break;
-      }
-      if (viva && buscar(restantes - 1)) return true;
-      usadas.delete(p); atribuida[melhor] = -1;
+      casas.forEach(([r, c], k) => { if (!atual[r][c]) { atual[r][c] = p[k]; novas.push([r, c]); } });
+      ind.bloquear(p, +1); atribuida[melhor] = id;
+      if (buscar(restantes - 1)) return true;
+      ind.bloquear(p, -1); atribuida[melhor] = -1;
       for (const [r, c] of novas) atual[r][c] = '';
       if (nos > limiteNos) return false;
     }
     return false;
   };
-  return { ok: buscar(vagas.length - fixas), nos, letras: atual };
+  const ok = buscar(vagas.length - fixas);
+  return { ok, nos, menor, total: vagas.length - fixas, letras: atual, falhas: vagas.map((v, i) => ({ casas: v.casas, n: falhas[i] })) };
+}
+
+/**
+ * Formas da mesma palavra que não podem aparecer juntas na grade: a própria,
+ * plural/singular, -M/-R/-AM/-RAM (ERA/ERAM, ORA/ORAR) e masculino/feminino.
+ */
+export function variantes(w) {
+  const v = new Set([w]);
+  const por = x => x.length >= 2 && v.add(x);
+  for (const suf of ['S', 'ES', 'M', 'R', 'AM', 'RAM']) {
+    por(w + suf);
+    if (w.endsWith(suf)) por(w.slice(0, -suf.length));
+  }
+  if (w.length >= 4 && /[OA]$/.test(w)) por(w.slice(0, -1) + (w.endsWith('O') ? 'A' : 'O'));
+  if (w.length >= 5 && /[OA]S$/.test(w)) por(w.slice(0, -2) + (w.at(-2) === 'O' ? 'A' : 'O') + 'S');
+  return v;
+}
+
+/**
+ * Índice das palavras para o preenchimento: por tamanho, um bitset por
+ * (posição, letra) — "palavras de 6 letras com A na 2ª" vira um E de bits, sem
+ * percorrer a lista. "livres" tira as já usadas e as variantes delas.
+ */
+function indexar(palavras) {
+  const porTamanho = {}, onde = new Map();
+  palavras.forEach((p, i) => {
+    const t = (porTamanho[p.length] ||= { ids: [] });
+    onde.set(p, [t, t.ids.length]);
+    t.ids.push(i);
+  });
+  for (const [n, t] of Object.entries(porTamanho)) {
+    const w = Math.ceil(t.ids.length / 32);
+    t.bits = Array.from({ length: +n }, () => Array.from({ length: 26 }, () => new Uint32Array(w)));
+    t.livres = new Uint32Array(w);
+    t.bloqueio = new Uint8Array(t.ids.length);
+    t.ids.forEach((id, j) => {
+      const p = palavras[id];
+      for (let k = 0; k < p.length; k++) t.bits[k][p.charCodeAt(k) - 65][j >> 5] |= 1 << (j & 31);
+      t.livres[j >> 5] |= 1 << (j & 31);
+    });
+  }
+  const bloquear = (p, delta) => {
+    for (const x of variantes(p)) {
+      const pos = onde.get(x);
+      if (!pos) continue;
+      const [t, j] = pos;
+      t.bloqueio[j] += delta;
+      if (t.bloqueio[j]) t.livres[j >> 5] &= ~(1 << (j & 31));
+      else t.livres[j >> 5] |= 1 << (j & 31);
+    }
+  };
+  return { porTamanho, bloquear };
+}
+
+function contar(m) {
+  let n = 0;
+  for (let x = 0; x < m.length; x++) {
+    let v = m[x] - ((m[x] >>> 1) & 0x55555555);
+    v = (v & 0x33333333) + ((v >>> 2) & 0x33333333);
+    n += (((v + (v >>> 4)) & 0x0F0F0F0F) * 0x01010101) >>> 24;
+  }
+  return n;
+}
+
+function bitsLigados(m, limite) {
+  const out = [];
+  for (let x = 0; x < m.length && out.length < limite; x++) {
+    let v = m[x];
+    while (v && out.length < limite) { const b = 31 - Math.clz32(v & -v); out.push(x * 32 + b); v &= v - 1; }
+  }
+  return out;
 }
 
 /**
@@ -238,4 +341,51 @@ export function montar(g, letras) {
   });
   dicas.sort((a, b) => a.linha - b.linha || a.coluna - b.coluna || ordem[a.direcao] - ordem[b.direcao]);
   return { grade, dicas };
+}
+
+/**
+ * Esqueleto + preenchimento com reparo. Quando a grade trava sempre na mesma
+ * vaga, põe uma casa de dica no meio dela (como quem monta a cruzada à mão),
+ * reajusta o esqueleto em volta e tenta de novo. Assim as casas de dica vão
+ * só para onde fazem falta e o resto da grade fica com palavras longas.
+ * Devolve { g, letras, reparos } ou null.
+ */
+export function gerarCruzada(rand, perfil, lista, { tentativas = 4, reparos = 10, nos = 1500 } = {}) {
+  let g = gerarEsqueleto(rand, perfil);
+  if (!g) return null;
+  const travadas = new Set();
+  let perf = { ...perfil };
+  for (let rodada = 0; rodada <= reparos; rodada++) {
+    const soma = new Map();
+    for (let k = 0; k < tentativas; k++) {
+      const r = preencher(g, lista, rand, nos);
+      if (r.ok) return { g, letras: r.letras, reparos: rodada };
+      for (const f of r.falhas) {
+        if (!f.n || f.casas.length < 3) continue;
+        const chave = f.casas[0].join(',') + ',' + f.casas.length + (f.casas[1][0] === f.casas[0][0] ? 'H' : 'V');
+        const s = soma.get(chave) || { casas: f.casas, n: 0 };
+        s.n += f.n;
+        soma.set(chave, s);
+      }
+    }
+    if (rodada === reparos) break;
+    const pior = [...soma.values()].sort((a, b) => b.n - a.n)[0];
+    if (!pior) break;
+    // uma casa do meio da vaga; de preferência sem sobrar pedaço de 2 ou 3 letras
+    // (um pedaço de 1 letra não é palavra: aquela letra fica só com a outra dica)
+    const n = pior.casas.length;
+    const meio = [];
+    for (let q = 1; q < n - 1; q++) meio.push(q);
+    const curto = x => x === 2 || x === 3;
+    const boas = meio.filter(q => !curto(q) && !curto(n - q - 1));
+    const opcoes = boas.length ? boas : meio;
+    const [r, c] = pior.casas[opcoes[Math.floor(rand() * opcoes.length)]];
+    g[r][c] = true;
+    travadas.add(r * L + c);
+    perf = { ...perf, alvoDicas: perf.alvoDicas + 1, maxTres: (perf.maxTres ?? 99) + (rodada % 3 === 2 ? 1 : 0) };
+    const g2 = gerarEsqueleto(rand, perf, 6000, g, travadas, 0.3);
+    if (!g2) break;
+    g = g2;
+  }
+  return null;
 }

@@ -3,10 +3,12 @@
 // cada cruzada — fica com a primeira grade que fechar sem defeito.
 //
 // Regras (para um jogo ser diferente do outro):
-//  - palavras de 5+ letras (e o plural/singular delas) não se repetem no mês;
-//  - curtas de 4 letras já usadas noutro nível do mesmo dia vão para o fim da fila;
+//  - palavras de 7+ letras (e o plural/singular delas) não se repetem no mês,
+//    as de 5–6 letras não se repetem em 14 dias (de 15 a 30 dias, vão para o fim
+//    da fila) e as de 5+ não se repetem dentro do lote (nem entre níveis do dia);
+//  - curtas de 3–4 letras já usadas noutro nível do mesmo dia vão para o fim da fila;
 //  - curtas usadas 7+ vezes nos dias vizinhos (±7) vão para o meio da fila;
-//  - curtas gastas (15+ vezes no último mês publicado) vão para o fim;
+//  - curtas gastas (15+ vezes no último mês publicado) ficam de fora;
 //  - AMO e AMA ficam de fora (apareciam em quase todo jogo);
 //  - numerais e ordinais ficam de fora (perfis.js);
 //  - grade com palavra proibida ou com duas formas da mesma palavra (AMARELO/
@@ -18,10 +20,14 @@ import { listaDoNivel, PERFIS } from './perfis.js';
 const JANELA = 30;     // dias: palavras de 5+ letras não se repetem
 const VIZINHOS = 7;    // dias: contagem das curtas
 const FORA_DE_VEZ = new Set(['AMO', 'AMA']);
+const MIN_LONGA = 7;   // usadas no mês com tantas letras ou mais não voltam
+const RECENTE = 14;    // dias: as de 5–6 letras usadas há menos que isso também não voltam
+const GASTA = 15;      // curtas usadas tantas vezes no mês ficam de fora
 
 let estado = null;     // estado do gerador (app.js): base, proibidas, puzzles
-let publicadas = null; // { inicio, longas: Set, curtas: [{ data, palavras }] }
+let publicadas = null; // { inicio, longas: Map palavra → última data, usos: Map, curtas: [{ data, palavras }] }
 let ativos = [];
+export let ultimaLista = null; // a lista da última cruzada pedida (para conferir pelo console)
 
 export function iniciarVariedade(est) { estado = est; publicadas = null; }
 
@@ -31,14 +37,17 @@ const distancia = (a, b) => Math.abs(new Date(`${a}T12:00:00Z`) - new Date(`${b}
 /** Lê as cruzadas publicadas do mês antes do lote (as do lote em diante vão ser trocadas). */
 async function lerPublicadas(inicio) {
   if (publicadas && publicadas.inicio === inicio) return;
-  publicadas = { inicio, longas: new Set(), curtas: [] };
+  publicadas = { inicio, longas: new Map(), usos: new Map(), curtas: [] };
   const indice = (await (await fetch('../puzzles/index.json', { cache: 'no-cache' })).json()).datas || {};
   const desde = somar(inicio, -JANELA);
   for (const [data, niveis] of Object.entries(indice)) {
     if (data < desde || data >= inicio) continue;
     for (const nivel of niveis) {
       const p = await (await fetch(`../puzzles/${data}-${nivel}.json`, { cache: 'no-cache' })).json();
-      p.dicas.forEach(d => d.resposta.length >= 5 && publicadas.longas.add(d.resposta));
+      for (const { resposta: w } of p.dicas) {
+        if (w.length >= 5 && !(publicadas.longas.get(w) > data)) publicadas.longas.set(w, data); // última vez usada
+        publicadas.usos.set(w, (publicadas.usos.get(w) || 0) + 1);
+      }
       publicadas.curtas.push({ data, palavras: p.dicas.map(d => d.resposta) });
     }
   }
@@ -73,13 +82,23 @@ export function defeito(dicas) {
   return null;
 }
 
-/** Palavras de 5+ letras a evitar (e o plural/singular delas): publicadas do mês e o resto do lote. */
-function evitarPara(arquivo) {
-  const ev = new Set();
-  const variar = w => { ev.add(w); ev.add(w + 'S'); if (w.endsWith('S')) ev.add(w.slice(0, -1)); };
-  publicadas.longas.forEach(variar);
-  for (const [a, p] of estado.puzzles) if (a !== arquivo) p.dicas.forEach(d => d.resposta.length >= 5 && variar(d.resposta));
-  return ev;
+/**
+ * Palavras a evitar nesta cruzada (cada uma com o plural/singular):
+ *  - duro (ficam de fora): as de 5+ letras do resto do lote (outros níveis do
+ *    mesmo dia, outros dias); as publicadas de 7+ letras do mês; as de 5–6
+ *    letras publicadas nos últimos 14 dias; as de 3–4 letras gastas (15+ vezes no mês);
+ *  - mole (vão para o fim da fila): as de 5–6 letras publicadas há 15–30 dias.
+ */
+function evitarPara(arquivo, data) {
+  const duro = new Set(), mole = new Set();
+  const variar = (w, alvo) => { alvo.add(w); alvo.add(w + 'S'); if (w.endsWith('S')) alvo.add(w.slice(0, -1)); };
+  for (const [w, ultima] of publicadas.longas) {
+    variar(w, w.length >= MIN_LONGA || distancia(ultima, data) <= RECENTE ? duro : mole);
+  }
+  for (const [w, n] of publicadas.usos) if (w.length >= 3 && w.length <= 4 && n >= GASTA) duro.add(w);
+  for (const [a, p] of estado.puzzles) if (a !== arquivo) p.dicas.forEach(d => d.resposta.length >= 5 && variar(d.resposta, duro));
+  for (const w of duro) mole.delete(w);
+  return { duro, mole };
 }
 
 /** Ordem das curtas: novas → muito usadas nos vizinhos → do mesmo dia e gastas. */
@@ -93,7 +112,7 @@ function ordenar(lista, data, arquivo) {
       if (f.data < publicadas.inicio) mes.set(w, (mes.get(w) || 0) + 1);
       if (distancia(f.data, data) > VIZINHOS) continue;
       vizinhas.set(w, (vizinhas.get(w) || 0) + 1);
-      if (f.data === data && w.length === 4) mesmoDia.add(w);
+      if (f.data === data) mesmoDia.add(w);
     }
   }
   const tardia = w => mesmoDia.has(w) || (mes.get(w) || 0) >= 15;
@@ -114,8 +133,12 @@ export function pararVariedade() { ativos.forEach(w => w.terminate()); ativos = 
 export async function gerarUma(data, nivel, inicio, n = 8) {
   await lerPublicadas(inicio);
   const arquivo = `${data}-${nivel}`;
-  const ev = evitarPara(arquivo);
-  const lista = ordenar(listaDoNivel(estado.base, nivel, ev).filter(w => !FORA_DE_VEZ.has(w) && !ev.has(w)), data, arquivo);
+  // as de 5–6 letras usadas há 15–30 dias só vão para o fim da fila: são as que
+  // cruzam com tudo, e proibir todas trava a grade com palavras longas
+  const { duro, mole } = evitarPara(arquivo, data);
+  const ordem = ordenar(listaDoNivel(estado.base, nivel, duro).filter(w => !FORA_DE_VEZ.has(w) && !duro.has(w)), data, arquivo);
+  const lista = [...ordem.filter(w => !mole.has(w)), ...ordem.filter(w => mole.has(w))];
+  ultimaLista = lista;
   pararVariedade();
   return new Promise(resolver => {
     let feito = false, falhas = 0, descartes = 0;
@@ -135,7 +158,7 @@ export async function gerarUma(data, nivel, inicio, n = 8) {
         pararVariedade();
         resolver({ data, nivel, semente: m.pronto.semente, grade: m.pronto.grade, dicas: m.pronto.dicas, descartes });
       };
-      w.postMessage({ id: arquivo, lista, perfil: PERFIS[nivel], semente: Math.floor(Math.random() * 1e8), tentativas: 8 });
+      w.postMessage({ id: arquivo, lista, perfil: PERFIS[nivel], semente: Math.floor(Math.random() * 1e8), tentativas: 400 });
     };
     for (let k = 0; k < n; k++) lancar();
   });

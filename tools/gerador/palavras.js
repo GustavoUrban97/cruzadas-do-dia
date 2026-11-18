@@ -40,7 +40,7 @@ export const normalizar = p => p.normalize('NFD').replace(/\p{M}/gu, '').toUpper
  *    com maiúscula são nomes próprios);
  *  - proibidas: Set de palavras já normalizadas.
  */
-export function montarLista(textoFrequencia, textoDicionario, proibidas, maxLetras = 8) {
+export function montarLista(textoFrequencia, textoDicionario, proibidas, maxLetras = 11) {
   const dicionario = new Set(textoDicionario.split(/\r?\n/).filter(p => p && p === p.toLowerCase()));
   const vistas = new Set();
   const lista = [];

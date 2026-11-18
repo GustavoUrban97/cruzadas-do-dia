@@ -5,13 +5,17 @@ import { CORINGAS } from './palavras.js';
 
 export const NIVEIS = ['facil', 'media', 'dificil'];
 
-// maxDuas: no máximo tantas palavras de 2 letras (são poucas e se repetem muito).
+// Palavras mais longas e poucas curtas (pedido de 18/11: "q tara por palavras
+// de 3 letras… coloca palavras maiores"):
+//  - maxLetras: a maior palavra;
+//  - alvoDicas: no máximo tantas casas de dica (menos casas = palavras mais longas);
+//  - maxDuas / maxTres: no máximo tantas palavras de 2 e de 3 letras;
+//  - simples: no máximo tantas letras do miolo que pertencem a uma palavra só
+//    (sem cruzamento) — um pouco de folga aqui é o que deixa a grade fechar.
 export const PERFIS = {
-  // palavras curtas e comuns, mais casas de dica
-  facil:   { maxLetras: 6, alvoDicas: 76, maxDuas: 11, densidade: 0.26, simples: 14 },
-  media:   { maxLetras: 7, alvoDicas: 72, maxDuas: 10, densidade: 0.22, simples: 12 },
-  // palavras mais longas e menos usuais, menos casas de dica
-  dificil: { maxLetras: 7, alvoDicas: 68, maxDuas: 9, densidade: 0.2, simples: 12 },
+  facil:   { maxLetras: 9, alvoDicas: 56, maxDuas: 5, maxTres: 12, densidade: 0.18, simples: 32 },
+  media:   { maxLetras: 9, alvoDicas: 56, maxDuas: 4, maxTres: 10, densidade: 0.18, simples: 32 },
+  dificil: { maxLetras: 9, alvoDicas: 54, maxDuas: 3, maxTres: 8, densidade: 0.17, simples: 34 },
 };
 
 /**
@@ -20,14 +24,15 @@ export const PERFIS = {
  *    preenche bem mais rápido: as comuns têm letras que cruzam fácil);
  *  - evitar: palavras de 5+ letras usadas há pouco (não repetir no mês).
  * Numerais e ordinais nunca entram. A variedade das curtas fica em variedade.js.
- * Palavras de 2–3 letras vêm de uma lista escolhida a dedo (palavras.js); no fácil
- * entram as que estão entre as 5.500 mais comuns; na média e no difícil, todas.
- * (Listas menores que estas não fecham com as regras de variedade.)
+ * Palavras de 2–3 letras vêm de uma lista escolhida a dedo (palavras.js).
  */
 export function listaDoNivel(base, nivel, evitar = new Set()) {
   const ok = p => !CORINGAS.has(p) && !(p.length >= 5 && evitar.has(p));
-  if (nivel === 'facil') return base.slice(0, 5500).filter(ok);
-  if (nivel === 'media') return base.slice(0, 7500).filter(ok);
-  // difícil: as menos usuais primeiro (faixa 1.500–7.500), as comuns como reserva
-  return [...base.slice(1500, 7500), ...base.slice(0, 1500)].filter(ok);
+  // as de 4–5 letras são poucas e são as que mais travam a grade: as que ficam
+  // fora do corte entram no fim da fila, em qualquer nível
+  const comReserva = (lista, corte) => [...lista, ...base.slice(corte).filter(p => p.length === 4 || p.length === 5)].filter(ok);
+  if (nivel === 'facil') return comReserva(base.slice(0, 8500), 8500);
+  if (nivel === 'media') return comReserva(base.slice(0, 9500), 9500);
+  // difícil: as menos usuais primeiro (faixa 2.000–12.000), as comuns como reserva
+  return comReserva([...base.slice(2000, 12000), ...base.slice(0, 2000)], 12000);
 }
