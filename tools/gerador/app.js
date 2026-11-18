@@ -2,20 +2,137 @@
 // evita repetir palavras de 5+ letras no mês, aplica os textos das dicas e
 // salva os arquivos (e o puzzles/index.json) na pasta puzzles/.
 
-import { NIVEIS, PERFIS, listaDoNivel } from './perfis.js';
-import { URL_FREQUENCIA, URL_DICIONARIO, montarLista, lerProibidas } from './palavras.js';
+import { NIVEIS, PERFIS, MAX_CURTA, listaDoNivel } from './perfis.js';
+import { URL_FREQUENCIA, URL_DICIONARIO, CORINGAS, montarLista, lerProibidas } from './palavras.js';
+import { rng } from './esqueleto.js';
 
 const $ = id => document.getElementById(id);
 const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const JANELA_SEM_REPETIR = 30; // dias
 const MIN_SEM_REPETIR = 5;     // palavras com 5+ letras não se repetem no mês (as curtas são a "cola" da grade)
+const JANELA_CURTAS = 14;      // dias: curtas usadas nesse intervalo vão para o fim da fila
 
 const estado = {
   base: null,          // lista geral de palavras
   indice: {},          // puzzles/index.json atual: { data: [níveis] }
   puzzles: new Map(),  // "AAAA-MM-DD-nivel" -> puzzle gerado
+  curtas: new Map(),   // data -> Map(palavra curta ou numeral -> vezes usada naquele dia)
   trabalhadores: [],
 };
+
+// ---------- Variedade das palavras curtas ----------
+
+const contaComoCurta = p => p.length <= MAX_CURTA || CORINGAS.has(p);
+
+/** Anota as palavras curtas (e numerais) de um puzzle no dia dele. */
+function registrarCurtas(data, dicas) {
+  const dia = estado.curtas.get(data) || new Map();
+  for (const { resposta } of dicas) if (contaComoCurta(resposta)) dia.set(resposta, (dia.get(resposta) || 0) + 1);
+  estado.curtas.set(data, dia);
+}
+
+/**
+ * Quanto cada curta foi usada perto desta data (±14 dias, todos os níveis).
+ * No mesmo dia pesa o triplo: os três níveis do dia não devem se parecer.
+ */
+function usosPara(data) {
+  const usos = new Map();
+  for (const [dia, palavras] of estado.curtas) {
+    const distancia = Math.abs(new Date(`${dia}T12:00:00Z`) - new Date(`${data}T12:00:00Z`)) / 864e5;
+    if (distancia > JANELA_CURTAS) continue;
+    const peso = dia === data ? 3 : 1;
+    for (const [p, n] of palavras) usos.set(p, (usos.get(p) || 0) + n * peso);
+  }
+  return usos;
+}
+
+/** Tira as curtas de um puzzle da contagem (antes de trocá-las). */
+function desregistrarCurtas(data, dicas) {
+  const dia = estado.curtas.get(data);
+  if (!dia) return;
+  for (const { resposta } of dicas) {
+    const n = dia.get(resposta);
+    if (n > 1) dia.set(resposta, n - 1); else if (n) dia.delete(resposta);
+  }
+}
+
+const VIZINHOS = 7; // dias
+
+/**
+ * Palavras de um puzzle que pesam na repetição: numerais e ordinais; e curtas de
+ * 3–4 letras que já estão noutro nível do mesmo dia ou em 2+ cruzadas dos dias
+ * vizinhos (±7). As de 2 letras ficam (são poucas, não tem como variar).
+ */
+function repetitivas(p) {
+  const conta = new Map(); // palavra -> [vezes nos vizinhos, vezes no mesmo dia]
+  for (const [dia, palavras] of estado.curtas) {
+    const distancia = Math.abs(new Date(`${dia}T12:00:00Z`) - new Date(`${p.data}T12:00:00Z`)) / 864e5;
+    if (distancia > VIZINHOS) continue;
+    for (const [w, n] of palavras) {
+      const c = conta.get(w) || [0, 0];
+      c[0] += n; if (dia === p.data) c[1] += n;
+      conta.set(w, c);
+    }
+  }
+  return p.dicas.map(d => d.resposta).filter(w => {
+    if (CORINGAS.has(w)) return true;
+    if (w.length < 3 || w.length > MAX_CURTA) return false;
+    const [vizinhos, mesmoDia] = conta.get(w) || [0, 0];
+    return mesmoDia >= 1 || vizinhos >= 2; // a própria cruzada já saiu da contagem
+  });
+}
+
+/**
+ * Passada de variedade: uma cruzada por vez (na ordem das datas), troca por
+ * conserto local as palavras repetitivas, já sabendo o que as anteriores usaram.
+ * Se o conserto não achar substitutas, a cruzada fica como estava.
+ */
+export function variarLote() {
+  return ocupado(async () => {
+    const base = await carregarBase();
+    // por data e, no dia, fácil → média → difícil (o fácil fica como saiu; os outros se afastam dele)
+    const ordem = a => { const p = estado.puzzles.get(a); return `${p.data}-${NIVEIS.indexOf(p.nivel)}`; };
+    const arquivos = [...estado.puzzles.keys()].sort((a, b) => ordem(a).localeCompare(ordem(b)));
+    if (!arquivos.length) return;
+    const datas = arquivos.map(a => estado.puzzles.get(a).data).sort();
+    const { recentes } = await lerExistentes(datas[0], 31);
+    for (const p of estado.puzzles.values()) registrarCurtas(p.data, p.dicas);
+    let trocadas = 0;
+    for (const arquivo of arquivos) {
+      const p = estado.puzzles.get(arquivo);
+      desregistrarCurtas(p.data, p.dicas);
+      const ruins = repetitivas(p);
+      if (!ruins.length) { registrarCurtas(p.data, p.dicas); continue; }
+      const evitar = new Set([...recentes, ...palavrasDoLote(new Set([arquivo]))]);
+      const antes = p.dicas.length;
+      await executar([{
+        arquivo, data: p.data, nivel: p.nivel, id: p.id, tentativa: 10 * (1 + Math.floor(Math.random() * 100)),
+        conserto: { grade: p.grade, semente: p.semente, ruins }, soConserto: true,
+      }], base, evitar);
+      const depois = estado.puzzles.get(arquivo);
+      if (depois === p) { registrarCurtas(p.data, p.dicas); log(`${arquivo}: não deu para trocar ${ruins.length}.`); continue; }
+      trocadas += ruins.length;
+      log(`${arquivo}: trocou ${ruins.length} palavra(s) curta(s) (${antes} → ${depois.dicas.length} palavras).`);
+    }
+    log(`Variedade: ${trocadas} troca(s).\n${resumoRepeticoes()}`);
+  });
+}
+
+/** Resumo das repetições do lote, para conferir antes de salvar. */
+export function resumoRepeticoes(puzzles = [...estado.puzzles.values()]) {
+  const conta = new Map();
+  for (const p of puzzles) for (const d of p.dicas) conta.set(d.resposta, (conta.get(d.resposta) || 0) + 1);
+  const linhas = [`${puzzles.length} cruzadas`];
+  for (const n of [2, 3, 4]) {
+    const ws = [...conta].filter(([w]) => w.length === n).sort((a, b) => b[1] - a[1]);
+    const usos = ws.reduce((s, [, k]) => s + k, 0);
+    linhas.push(`${n} letras: ${ws.length} diferentes, ${usos} usos; mais repetidas: ${ws.slice(0, 6).map(([w, k]) => `${w} ${k}`).join(', ')}`);
+  }
+  const longas = [...conta].filter(([w, k]) => w.length >= 5 && k > 1);
+  linhas.push(`5+ letras repetidas no lote: ${longas.length}`);
+  linhas.push(`numerais/ordinais: ${[...conta].filter(([w]) => CORINGAS.has(w)).reduce((s, [, k]) => s + k, 0)}`);
+  return linhas.join('\n');
+}
 
 // ---------- Utilidades ----------
 
@@ -118,11 +235,15 @@ async function lerExistentes(inicio, dias) {
   const recentes = new Set();
   const desde = somarDias(inicio, -JANELA_SEM_REPETIR);
   const ate = somarDias(inicio, dias + JANELA_SEM_REPETIR);
+  estado.curtas = new Map();
   for (const [data, niveis] of Object.entries(estado.indice)) {
     for (const nivel of niveis) {
       const p = JSON.parse(await buscarTexto(`../puzzles/${data}-${nivel}.json`));
       maiorId = Math.max(maiorId, p.id);
-      if (data >= desde && data < ate) p.dicas.forEach(d => d.resposta.length >= MIN_SEM_REPETIR && recentes.add(d.resposta));
+      if (data >= desde && data < ate) {
+        p.dicas.forEach(d => d.resposta.length >= MIN_SEM_REPETIR && recentes.add(d.resposta));
+        registrarCurtas(data, p.dicas);
+      }
     }
   }
   return { maiorId, recentes };
@@ -164,7 +285,12 @@ function executar(fila, base, evitar) {
     const proximo = trabalhador => {
       const tarefa = fila.shift();
       if (!tarefa) { trabalhador.terminate(); if (--ativos === 0) resolver(); return; }
-      const lista = listaDoNivel(base, tarefa.nivel, evitar);
+      // no conserto, as palavras trocadas não podem voltar
+      const excluir = new Set(tarefa.conserto ? tarefa.conserto.ruins : []);
+      // a ordem por uso (variedade) só no conserto: gerar com ela fica lento demais
+      const lista = listaDoNivel(base, tarefa.nivel, evitar, tarefa.soConserto ? {
+        usos: usosPara(tarefa.data), rand: rng(semente(tarefa.arquivo, tarefa.tentativa) + 7),
+      } : {}).filter(p => !excluir.has(p));
       trabalhador.onmessage = ({ data: msg }) => {
         if (msg.log) return;
         if (msg.falhou) {
@@ -182,6 +308,7 @@ function executar(fila, base, evitar) {
           fila.push({ ...tarefa, tentativa: tarefa.tentativa + 1 });
         } else {
           longas.forEach(p => evitar.add(p));
+          registrarCurtas(tarefa.data, msg.pronto.dicas);
           estado.puzzles.set(tarefa.arquivo, {
             id: tarefa.id, data: tarefa.data, nivel: tarefa.nivel, titulo: titulo(tarefa.data, tarefa.nivel),
             autor: 'Gustavo', semente: msg.pronto.semente, grade: msg.pronto.grade, dicas: msg.pronto.dicas,
@@ -192,7 +319,7 @@ function executar(fila, base, evitar) {
         }
         proximo(trabalhador);
       };
-      trabalhador.postMessage({ id: tarefa.arquivo, lista, perfil: PERFIS[tarefa.nivel], semente: semente(tarefa.arquivo, tarefa.tentativa), conserto: tarefa.conserto || null });
+      trabalhador.postMessage({ id: tarefa.arquivo, lista, perfil: PERFIS[tarefa.nivel], semente: semente(tarefa.arquivo, tarefa.tentativa), conserto: tarefa.conserto || null, soConserto: Boolean(tarefa.soConserto) });
     };
     for (let i = 0; i < Math.min(paralelos, fila.length); i++) {
       const t = new Worker('gerador/trabalhador.js', { type: 'module' });
@@ -207,7 +334,7 @@ function executar(fila, base, evitar) {
 
 /** Envolve uma ação longa: trava os botões e mostra erros no andamento. */
 async function ocupado(acao) {
-  $('gerar').disabled = $('refazer').disabled = true; $('parar').disabled = false;
+  $('gerar').disabled = $('refazer').disabled = $('variar').disabled = true; $('parar').disabled = false;
   try {
     await acao();
     log('Pronto.');
@@ -216,7 +343,7 @@ async function ocupado(acao) {
     console.error(erro);
   } finally {
     estado.trabalhadores = [];
-    $('gerar').disabled = $('refazer').disabled = false; $('parar').disabled = true;
+    $('gerar').disabled = $('refazer').disabled = $('variar').disabled = false; $('parar').disabled = true;
     $('salvar-pasta').disabled = $('baixar').disabled = estado.puzzles.size === 0;
   }
 }
@@ -231,6 +358,7 @@ function gerar() {
     const base = await carregarBase();
     const { maiorId, recentes } = await lerExistentes(inicio, dias);
     const evitar = new Set([...recentes, ...palavrasDoLote()]); // cresce a cada puzzle pronto
+    for (const p of estado.puzzles.values()) registrarCurtas(p.data, p.dicas);
     const fila = [];
     let proximoId = Math.max(maiorId, ...[...estado.puzzles.values()].map(p => p.id)) + 1;
     for (let i = 0; i < dias; i++) {
@@ -243,6 +371,7 @@ function gerar() {
       }
     }
     await executar(fila, base, evitar);
+    log(resumoRepeticoes());
   });
 }
 
@@ -364,6 +493,7 @@ async function iniciar() {
   $('salvar-pasta').disabled = $('baixar').disabled = estado.puzzles.size === 0;
   $('gerar').addEventListener('click', gerar);
   $('refazer').addEventListener('click', refazerProibidas);
+  $('variar').addEventListener('click', variarLote);
   $('limpar').addEventListener('click', () => {
     if (!estado.puzzles.size || confirm('Apagar o lote atual (cruzadas geradas e dicas aplicadas)?')) {
       estado.puzzles = new Map(); guardarLote(); desenhar(); log('Lote limpo.');
@@ -386,6 +516,6 @@ async function iniciar() {
 }
 
 // Para automação/testes pelo console.
-window.gerador = { estado, gerar, refazerProibidas, aplicarDicas, palavrasSemDica, serializar, indiceAtualizado, escolherBanco, carregarBase };
+window.gerador = { estado, gerar, refazerProibidas, variarLote, aplicarDicas, palavrasSemDica, serializar, indiceAtualizado, escolherBanco, carregarBase, resumoRepeticoes };
 
 iniciar();
