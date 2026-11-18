@@ -14,45 +14,20 @@ export const PERFIS = {
   dificil: { maxLetras: 7, alvoDicas: 68, maxDuas: 9, densidade: 0.2, simples: 12 },
 };
 
-export const MAX_CURTA = 4; // até 4 letras: "cola" da grade, pode repetir, mas de preferência não
-
 /**
  * Lista de palavras do nível, em ordem de preferência (as primeiras saem mais).
- *  - base: lista geral, da mais comum para a menos comum;
- *  - evitar: palavras de 5+ letras usadas há pouco (não repetir no mês);
- *  - usos (só na passada de variedade): palavras curtas (até 4 letras) -> quanto
- *    foram usadas perto desta data; sem usos, as curtas ficam na ordem da
- *    frequência, que preenche bem mais rápido (letras que cruzam fácil);
- *  - rand: sorteio (com semente) para variar a ordem das curtas.
- * Numerais e ordinais nunca entram.
+ *  - base: lista geral, da mais comum para a menos comum (a ordem por frequência
+ *    preenche bem mais rápido: as comuns têm letras que cruzam fácil);
+ *  - evitar: palavras de 5+ letras usadas há pouco (não repetir no mês).
+ * Numerais e ordinais nunca entram. A variedade das curtas fica em variedade.js.
  * Palavras de 2–3 letras vêm de uma lista escolhida a dedo (palavras.js); no fácil
  * entram as que estão entre as 5.500 mais comuns; na média e no difícil, todas.
+ * (Listas menores que estas não fecham com as regras de variedade.)
  */
-export function listaDoNivel(base, nivel, evitar = new Set(), { usos = null, rand = Math.random } = {}) {
-  const fora = p => p.length >= 5 && evitar.has(p);
-  let lista;
-  if (nivel === 'facil') lista = base.slice(0, 5500).filter(p => !fora(p));
-  else if (nivel === 'media') lista = base.slice(0, 7500).filter(p => !fora(p));
+export function listaDoNivel(base, nivel, evitar = new Set()) {
+  const ok = p => !CORINGAS.has(p) && !(p.length >= 5 && evitar.has(p));
+  if (nivel === 'facil') return base.slice(0, 5500).filter(ok);
+  if (nivel === 'media') return base.slice(0, 7500).filter(ok);
   // difícil: as menos usuais primeiro (faixa 1.500–7.500), as comuns como reserva
-  else lista = [...base.slice(1500, 7500), ...base.slice(0, 1500)].filter(p => !fora(p));
-  return usos ? variar(lista, usos, rand) : lista.filter(p => !CORINGAS.has(p));
-}
-
-/**
- * Reordena para cada jogo ser diferente do outro:
- *  - as curtas (até 4 letras) perdem a preferência pela frequência (são todas
- *    conhecidas): as menos usadas nos últimos dias vêm primeiro, sorteadas;
- *  - numerais e ordinais ficam de fora (apareciam demais, com dicas repetitivas).
- * A ordem entre tamanhos diferentes não importa (cada vaga só aceita um tamanho).
- */
-function variar(lista, usos, rand) {
-  const longas = [], curtas = [];
-  for (const p of lista) {
-    if (CORINGAS.has(p)) continue;
-    if (p.length <= MAX_CURTA) curtas.push(p);
-    else longas.push(p);
-  }
-  const chave = new Map(curtas.map(p => [p, 2 * (usos.get(p) || 0) + rand()]));
-  curtas.sort((a, b) => chave.get(a) - chave.get(b));
-  return [...longas, ...curtas];
+  return [...base.slice(1500, 7500), ...base.slice(0, 1500)].filter(ok);
 }
