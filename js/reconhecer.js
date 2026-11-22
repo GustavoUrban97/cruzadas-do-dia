@@ -31,7 +31,12 @@ export function carregarModelo() {
       const pesos = decodificarFloat16(new Uint16Array(binario));
       const pegar = ({ inicio, tamanho }) => pesos.subarray(inicio, inicio + tamanho);
       const camadas = descricao.camadas.map(c => (c.pesos ? { ...c, w: pegar(c.pesos), b: pegar(c.vies) } : c));
-      return { ...descricao, camadas };
+      // A rede pode ter mais de uma saída por letra (maiúscula e minúscula de
+      // desenho diferente, como A e a): `saidas` são as saídas da rede, `classes`
+      // as 26 letras e `grupo` diz a letra de cada saída.
+      const classes = [...new Set(descricao.classes.toUpperCase())].join('');
+      const grupo = Array.from(descricao.classes, l => classes.indexOf(l.toUpperCase()));
+      return { ...descricao, saidas: descricao.classes, classes, grupo, camadas };
     })();
     modeloPromessa.catch(() => { modeloPromessa = null; });
   }
@@ -130,11 +135,16 @@ function densa(x, { entrada, saida, w: pesos, b: vies }) {
   return y;
 }
 
-export function probabilidades(logits) {
+/** Saídas da rede -> probabilidade de cada letra (com o modelo, soma as formas da mesma letra). */
+export function probabilidades(logits, modelo = null) {
   const max = Math.max(...logits);
   const e = Array.from(logits, v => Math.exp(v - max));
   const soma = e.reduce((a, b) => a + b, 0);
-  return e.map(v => v / soma);
+  const p = e.map(v => v / soma);
+  if (!modelo?.grupo) return p;
+  const porLetra = new Array(modelo.classes.length).fill(0);
+  p.forEach((v, i) => { porLetra[modelo.grupo[i]] += v; });
+  return porLetra;
 }
 
 // ---------- Traços -> imagem como o EMNIST ----------
@@ -301,5 +311,5 @@ export function conferirLetra(modelo, probs, esperada) {
 export function conferirCasa(modelo, tracosDaCasa, esperada, espessura = ESPESSURA_PADRAO) {
   const imagem = rasterizar(tracosDaCasa, espessura);
   if (!imagem) return null;
-  return { ...conferirLetra(modelo, probabilidades(inferir(modelo, imagem)), esperada), imagem };
+  return { ...conferirLetra(modelo, probabilidades(inferir(modelo, imagem), modelo), esperada), imagem };
 }
