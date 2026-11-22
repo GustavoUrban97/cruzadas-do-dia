@@ -20,13 +20,13 @@ Publicado no **GitHub Pages** (repositório público) e usado como **página com
 - Enquanto eu escrevo, o app **não ajuda**: só guarda os traços. Ele só **confere quando eu peço** (botão **Conferir**), e mesmo assim não mostra a resposta: marca as casas erradas e as que não conseguiu ler.
 - A grade é uma folha onde se desenha livremente: letra no quadrado, palpite pequeno no canto, rabisco, riscar a dica resolvida na própria casa de dica.
 - **Sem botão Revelar.** As respostas só aparecem se eu **desistir** (como o Termo mostra a palavra quando a gente perde) ou no **gabarito** dos dias passados.
-- A escrita à caneta é lida por um modelo de letras que roda no próprio aparelho (`js/reconhecer.js`, modelo em `modelo/`): como o app sabe a resposta de cada casa, ele só confere se a tinta parece a letra esperada. Só a **caneta** conta; o **lápis** é rascunho e nunca é conferido; o que está nas casas de dica (riscar a dica) é ignorado.
+- A escrita à caneta é lida por um modelo de letras que roda no próprio aparelho (`js/reconhecer.js`, modelo em `modelo/`): como o app sabe a resposta de cada casa, ele só confere se a tinta parece a letra esperada. Só a **caneta** conta; o **lápis** é rascunho e nunca é conferido; o que está nas casas de dica (riscar a dica) é ignorado. A leitura também aprende a letra de quem joga (`js/memoria.js`): as casas das cruzadas resolvidas viram exemplos confirmados, guardados só no aparelho, e cada casa nova é comparada com os mais parecidos.
 
 ## Stack
 
 - **HTML + CSS + JavaScript puro (ES modules), sem etapa de build.** O GitHub Pages serve os arquivos como estão. Sem frameworks e sem npm no app.
 - `sw.js` (service worker): guarda os arquivos da página para abrir sem internet e controla as versões (aviso "Atualização disponível"). Não há manifesto: a página não é instalável.
-- Persistência local: **IndexedDB** para a tinta (traços e letras digitadas) e o registro, com chave `[data, nivel]` (banco versão 3). `localStorage` só para preferências leves (ferramenta, cor, nível e gabarito visível). Sempre com try/catch.
+- Persistência local: **IndexedDB** para a tinta (traços e letras digitadas) e o registro, com chave `[data, nivel]` (banco versão 4; a loja `memoria` guarda os resumos das letras confirmadas, sai da tinta e não entra no backup). `localStorage` só para preferências leves (ferramenta, cor, nível e gabarito visível). Sempre com try/catch.
 - Alvo: Chrome no Android 14+ (Tab S9; também celular, como o S24, só no modo teclado). Não precisa suportar outros navegadores, mas não deve quebrar no Chrome desktop (útil para desenvolver com mouse).
 
 ## Estrutura do repositório
@@ -44,6 +44,7 @@ js/datas.js        # "hoje" em America/Sao_Paulo, formatação
 js/diagnostico.js  # tela ?debug=1
 js/historico.js    # painel "Meu histórico": estatísticas, calendário, backup
 js/reconhecer.js   # reconhecimento das letras à caneta (modelo em modelo/), para conferir
+js/memoria.js      # memória de letras: aprende a letra de quem joga com as cruzadas resolvidas (só no aparelho)
 js/conferencia.js  # botão Conferir: leitura em segundo plano, marcas, resultado
 js/niveis.js       # os três níveis (fácil, média, difícil)
 puzzles/
@@ -199,7 +200,7 @@ Fora do app (não entram no service worker):
 8. **Conteúdo:** gerador em `tools/gerador.html` (o Python ficou só no validador) e um banco inicial de 30 dias × 3 níveis, em 3 lotes de 10 dias.
 9. **Modo teclado:** ferramenta Teclado, teclado próprio estilo Termo, faixa da dica atual, letras salvas com a tinta, conferência das letras digitadas no gabarito, backup formato 3. ✔
 10. **Celular:** layout para tela estreita (S24) só com o modo teclado, cabeçalho compacto, ◀ ▶ na faixa da dica. ✔
-11. **Conferir a caneta:** modelo de letras treinado no EMNIST Letters (GitHub Actions, rede pequena, ~94,5% no teste, 266 KB em float16, no cache offline; o treino abre parte dos O e falha o traço de vez em quando, porque O sem fechar em cima virava U), `js/reconhecer.js` (traços da casa → imagem 28×28 como o EMNIST → rede em JS puro; certa / errada / ilegível sabendo a letra esperada; letras parecidas com a esperada, como U, C ou J no lugar de O, nunca contam como erradas), página de teste `tools/reconhecer.html` e `js/conferencia.js` (leitura em segundo plano, botão Conferir, marcas, Desistir, registro automático). ✔
+11. **Conferir a caneta:** modelo de letras treinado no EMNIST ByMerge, só letras, com maiúscula e minúscula de desenho diferente separadas (A e a, R e r; o app soma as duas), sorteio com o mesmo peso por letra e deformação elástica (GitHub Actions, ~42 min, rede pequena, ~95,1% no teste, 269 KB em float16, no cache offline; o treino abre parte dos O e falha o traço de vez em quando, porque O sem fechar em cima virava U), `js/reconhecer.js` (traços da casa → imagem 28×28 como o EMNIST → rede em JS puro; certa / errada / ilegível sabendo a letra esperada; letras parecidas com a esperada, como U, C ou J no lugar de O, nunca contam como erradas), página de teste `tools/reconhecer.html` e `js/conferencia.js` (leitura em segundo plano, botão Conferir, marcas, Desistir, registro automático). Em 21/11, com A de topo redondo saindo ilegível, entrou a **memória de letras** (`js/memoria.js`: até 80 exemplos por letra das 30 cruzadas resolvidas mais recentes, 10 vizinhos mais próximos na penúltima camada, mistura meio a meio com a rede; refeita sozinha em segundo plano quando o modelo muda). Medido na tinta de 13 cruzadas (ferramenta fora do repositório, em `tools/_letra/`): ilegíveis 30 → 9, A 16 → 1. ✔
 
 ## Critérios de aceite
 
