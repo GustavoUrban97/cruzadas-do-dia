@@ -12,7 +12,8 @@
 //  - AMO e AMA ficam de fora (apareciam em quase todo jogo);
 //  - numerais e ordinais ficam de fora (perfis.js);
 //  - grade com palavra proibida ou com duas formas da mesma palavra (AMARELO/
-//    AMARELA, MAR/MARES; tolera um par de 3 letras, como ASA/ASAS) é descartada.
+//    AMARELA, MAR/MARES, EDITOR/EDITORES; tolera um par de 3 letras, como ASA/ASAS)
+//    é descartada; o gênero e o número também valem entre as cruzadas do lote.
 // Apertar mais que isso trava o preenchimento (testado: a média não fecha).
 
 import { listaDoNivel, PERFIS } from './perfis.js';
@@ -29,6 +30,7 @@ let estado = null;     // estado do gerador (app.js): base, proibidas, puzzles
 let publicadas = null; // { inicio, longas: Map palavra → última data, usos: Map, curtas: [{ data, palavras }] }
 let ativos = [];
 export let ultimaLista = null; // a lista da última cruzada pedida (para conferir pelo console)
+export const descartados = []; // motivos dos descartes (para conferir pelo console)
 
 export function iniciarVariedade(est) { estado = est; publicadas = null; }
 
@@ -81,9 +83,22 @@ export function defeito(dicas, nivel = null) {
     }
     const fins = new Set([a.at(-1), b.at(-1)]);
     if (curta.length >= 4 && a.length === b.length && a.slice(0, -1) === b.slice(0, -1) && fins.has('O') && fins.has('A')) return `${a}/${b}`;
+    // gênero e número com 5+ letras: EDITOR/EDITORA/EDITORES, AMARGO/AMARGAS
+    if (curta.length >= 5 && raiz(a).length >= 4 && raiz(a) === raiz(b)) return `${a}/${b}`;
   }
   return null;
 }
+
+/** Tira plural e gênero: EDITORES → EDITOR, EDITORA → EDITOR, AMARGOS → AMARG. */
+function raiz(w) {
+  if (w.endsWith('S')) w = w.slice(0, -1);
+  if (w.endsWith('E') && 'RLZS'.includes(w.at(-2))) w = w.slice(0, -1);
+  if ((w.endsWith('A') || w.endsWith('O')) && w.length > 4) w = w.slice(0, -1);
+  return w;
+}
+
+/** Formas de gênero e número a partir da raiz (sobram algumas que não existem; não faz mal). */
+const formas = w => { const r = raiz(w); return [w, ...['', 'S', 'A', 'AS', 'O', 'OS', 'E', 'ES'].map(f => r + f)]; };
 
 /**
  * Palavras a evitar nesta cruzada (cada uma com o plural/singular):
@@ -96,10 +111,11 @@ function evitarPara(arquivo, data) {
   const duro = new Set(), mole = new Set();
   const variar = (w, alvo) => { alvo.add(w); alvo.add(w + 'S'); if (w.endsWith('S')) alvo.add(w.slice(0, -1)); };
   for (const [w, ultima] of publicadas.longas) {
-    variar(w, w.length >= MIN_LONGA || distancia(ultima, data) <= RECENTE ? duro : mole);
+    if (w.length >= MIN_LONGA) formas(w).forEach(f => duro.add(f)); // COREANO ontem → nem COREANA hoje
+    else variar(w, distancia(ultima, data) <= RECENTE ? duro : mole);
   }
   for (const [w, n] of publicadas.usos) if (w.length >= 3 && w.length <= 4 && n >= GASTA) duro.add(w);
-  for (const [a, p] of estado.puzzles) if (a !== arquivo) p.dicas.forEach(d => d.resposta.length >= 5 && variar(d.resposta, duro));
+  for (const [a, p] of estado.puzzles) if (a !== arquivo) p.dicas.forEach(d => d.resposta.length >= 5 && formas(d.resposta).forEach(f => duro.add(f)));
   for (const w of duro) mole.delete(w);
   return { duro, mole };
 }
@@ -150,7 +166,9 @@ export async function gerarUma(data, nivel, inicio, n = 8) {
       ativos.push(w);
       w.onmessage = ({ data: m }) => {
         if (m.log || feito) return;
-        if (!m.falhou && defeito(m.pronto.dicas, nivel)) {
+        const motivo = !m.falhou && defeito(m.pronto.dicas, nivel);
+        if (motivo) {
+          descartados.push(`${arquivo}: ${motivo}`);
           // grade com defeito: descarta e põe outro trabalho no lugar
           w.terminate();
           if (++descartes <= 40) { lancar(); return; }
