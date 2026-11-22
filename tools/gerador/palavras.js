@@ -20,6 +20,52 @@ const TRES_LETRAS = new Set((
   'SOU DOU VOU FUI FOI DEU LEU VIU RIU'
 ).split(' '));
 
+// Palavras "de revista" (bichos, plantas, objetos, termos), com definição clara,
+// que a lista de legendas quase não traz. Entram na lista base na posição
+// POSICAO_EXTRAS (todas os níveis as alcançam). Precisam estar no dicionário.
+const EXTRAS = (
+  'ARE ARA OBA CAS GNU AIO UPA URU MI FA ' +
+  'ANTA ATOL ANIL ALHO ARCO ASNO BAGO BOTO CAJU COCO COXA CUCO DUNA EGUA FAVO FOCA GALO GAMO ' +
+  'GOMO ILHA JACA JUBA LAGO LAMA LIRA LOBO MAGO MICO MOLA NABO OBOE OLMO ONCA ORCA OSSO OVAS ' +
+  'PATO PERA PIPA PUMA ROCA RUBI SAPO SEDA SOJA TATU TEIA TUBA URSO URNA VASO VELA ZEBU ARARA ' +
+  'GRUTA LONTRA TUCANO JIBOIA CORUJA GIRAFA CAMELO ESQUILO PINGUIM GOLFINHO CANGURU ' +
+  'ABACATE ABACAXI AMEIXA CEREJA GOIABA MAMAO MARACUJA PITANGA JABUTICABA ' +
+  'BIGORNA BUSSOLA CANIVETE CATAVENTO AMPULHETA LUNETA TROMBONE SANFONA BERIMBAU PANDEIRO ' +
+  'CAVAQUINHO ATABAQUE ORQUIDEA GIRASSOL BROMELIA SAMAMBAIA CACTO BAOBA IPE JEQUITIBA'
+).split(' ');
+const POSICAO_EXTRAS = 3000;
+
+// Nomes próprios conhecidos (países, capitais, rios, estados, personagens,
+// figuras históricas), para dicas de conhecimento geral como nas revistas.
+// Entram mais para o fim da lista (POSICAO_NOMES) e cada cruzada aceita poucos
+// (variedade.js). Sem times, marcas nem pessoas vivas.
+export const NOMES = new Set((
+  'PERU CUBA CHILE CHINA JAPAO ITALIA FRANCA EGITO GRECIA MEXICO CANADA NEPAL QUENIA ANGOLA HAITI ' +
+  'INDIA SUICA SUECIA NORUEGA HOLANDA BELGICA POLONIA PORTUGAL ESPANHA MARROCOS TURQUIA BOLIVIA ' +
+  'URUGUAI PARAGUAI COLOMBIA EQUADOR PANAMA IRLANDA ESCOCIA ISLANDIA ETIOPIA SENEGAL TUNISIA CHIPRE MALTA TAITI ' +
+  'ROMA PARIS LIMA OSLO LONDRES MADRI LISBOA BERLIM VIENA ATENAS CAIRO TOQUIO PEQUIM DUBLIN PRAGA ' +
+  'QUITO BOGOTA CARACAS HAVANA SANTIAGO LUANDA DACAR NAIROBI BERNA ANCARA SEUL HANOI MANILA ' +
+  'BAHIA GOIAS ACRE AMAPA CEARA PIAUI SERGIPE ALAGOAS RORAIMA MARANHAO RECIFE BELEM MANAUS MACEIO ' +
+  'ARACAJU CUIABA CURITIBA GOIANIA TERESINA OLINDA ' +
+  'NILO AMAZONAS TIETE SENA TAMISA DANUBIO RENO VOLGA GANGES JORDAO TEJO DOURO XINGU TAPAJOS ARAGUAIA ' +
+  'PERI IRACEMA CAPITU MACUNAIMA EMILIA PEDRINHO SACI CURUPIRA IARA BOITATA QUIXOTE HAMLET ROMEU ' +
+  'JULIETA ULISSES AQUILES HERCULES ZEUS APOLO ATENA NETUNO PLUTAO JUPITER SATURNO VENUS ODIN THOR ' +
+  'PELE GARRINCHA SENNA TIRADENTES CABRAL DARWIN NEWTON EINSTEIN MOZART BACH BEETHOVEN PICASSO DALI ' +
+  'GOYA MONET DANTE CAMOES DRUMMOND PORTINARI TARSILA NIEMEYER GANDHI DUMONT CHAPLIN PLATAO SOCRATES ' +
+  'HOMERO COLOMBO GALILEU EDISON TESLA'
+).split(' '));
+const POSICAO_NOMES = 6000;
+
+// Terminações de formas verbais conjugadas que não se confundem com substantivo
+// (andava, falaram, comendo, partiu...), por infinitivo. Essas formas quase não
+// têm definição e puxam dica de completar ("___"); vão para o fim da fila.
+// Particípios (-ADO, -IDO) ficam de fora: valem como adjetivo.
+const TERMINACOES = {
+  AR: 'ANDO AVA AVAM AVAS AVAMOS ARAM ASSE ASSEM ASSES AREI ARIA ARIAM ARAO AREMOS AMOS ASTE OU EI AM ARMOS AREM',
+  ER: 'ENDO IA IAM IAS ERAM ESSE ESSEM EREI ERIA ERIAM ERAO EMOS ESTE EU EM ERMOS EREM',
+  IR: 'INDO IA IAM IRAM ISSE ISSEM IREI IRIA IRAO IMOS ISTE IU EM IRMOS IREM',
+};
+
 // Numerais e ordinais: aparecem demais e puxam dicas repetitivas ("depois do
 // sétimo"). Ficam fora das cruzadas.
 export const CORINGAS = new Set((
@@ -55,7 +101,37 @@ export function montarLista(textoFrequencia, textoDicionario, proibidas, maxLetr
     vistas.add(p);
     lista.push(p);
   }
+  // palavras de revista e nomes próprios, cada grupo na sua posição
+  // (as que já estão na lista, mas mais para o fim, sobem para essa posição)
+  const semAcento = new Set([...dicionario].map(normalizar)); // "onça" -> ONCA
+  const extras = EXTRAS.filter(p => p.length <= maxLetras && !proibidas.has(p) && semAcento.has(p) &&
+    !(vistas.has(p) && lista.indexOf(p) < POSICAO_EXTRAS));
+  const subir = new Set(extras);
+  for (let i = lista.length - 1; i >= 0; i--) if (subir.has(lista[i])) lista.splice(i, 1);
+  extras.forEach(p => vistas.add(p));
+  lista.splice(Math.min(POSICAO_EXTRAS, lista.length), 0, ...extras);
+  const nomes = [...NOMES].filter(p => p.length <= maxLetras && !vistas.has(p));
+  lista.splice(Math.min(POSICAO_NOMES, lista.length), 0, ...nomes);
   return lista;
+}
+
+/**
+ * Formas verbais conjugadas da lista (4+ letras): terminação de TERMINACOES cujo
+ * radical + AR/ER/IR está no dicionário (ANDO -> ANDAR; COMIA -> COMER).
+ */
+export function formasVerbais(lista, textoDicionario) {
+  const dicionario = new Set(textoDicionario.split(/\r?\n/).filter(p => p && p === p.toLowerCase()).map(normalizar));
+  const verbais = new Set();
+  for (const p of lista) {
+    if (p.length < 4 || NOMES.has(p)) continue;
+    for (const [infinitivo, lista] of Object.entries(TERMINACOES)) {
+      if (lista.split(' ').some(t => p.endsWith(t) && p.length - t.length >= 2 && dicionario.has(p.slice(0, -t.length) + infinitivo))) {
+        verbais.add(p);
+        break;
+      }
+    }
+  }
+  return verbais;
 }
 
 /** Lê tools/proibidas.txt: uma palavra por linha; # começa comentário. */

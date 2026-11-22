@@ -77,17 +77,19 @@ export function atribuirDicas(g) {
 
 /** "Feiura" do esqueleto; 0 = pronto. */
 function custo(g, perfil) {
-  let s = 0, duas = 0, tres = 0;
+  let s = 0, duas = 0, tres = 0, quatro = 0;
   const contagem = Array.from({ length: A }, () => Array(L).fill(0)); // em quantas palavras cada letra está
   for (const seq of sequencias(g)) {
     const n = seq.casas.length;
     if (n > perfil.maxLetras) s += (n - perfil.maxLetras) * 2;
     if (n === 2) duas++;
     if (n === 3) tres++;
+    if (n === 4) quatro++;
     if (n >= 2) for (const [r, c] of seq.casas) contagem[r][c]++;
   }
   if (duas > perfil.maxDuas) s += duas - perfil.maxDuas;
   if (tres > (perfil.maxTres ?? Infinity)) s += tres - perfil.maxTres;
+  if (quatro > (perfil.maxQuatro ?? Infinity)) s += (quatro - perfil.maxQuatro) * 0.5;
   let dicas = 0, simples = 0;
   for (let r = 0; r < A; r++) for (let c = 0; c < L; c++) {
     if (!g[r][c]) {
@@ -371,18 +373,19 @@ export function gerarCruzada(rand, perfil, lista, { tentativas = 4, reparos = 10
     if (rodada === reparos) break;
     const pior = [...soma.values()].sort((a, b) => b.n - a.n)[0];
     if (!pior) break;
-    // uma casa do meio da vaga; de preferência sem sobrar pedaço de 2 ou 3 letras
+    // uma casa do meio da vaga; de preferência sem sobrar pedaço de 2 a 4 letras
     // (um pedaço de 1 letra não é palavra: aquela letra fica só com a outra dica)
     const n = pior.casas.length;
     const meio = [];
     for (let q = 1; q < n - 1; q++) meio.push(q);
-    const curto = x => x === 2 || x === 3;
+    const curto = x => x >= 2 && x <= 4;
     const boas = meio.filter(q => !curto(q) && !curto(n - q - 1));
     const opcoes = boas.length ? boas : meio;
     const [r, c] = pior.casas[opcoes[Math.floor(rand() * opcoes.length)]];
     g[r][c] = true;
     travadas.add(r * L + c);
-    perf = { ...perf, alvoDicas: perf.alvoDicas + 1, maxTres: (perf.maxTres ?? 99) + (rodada % 3 === 2 ? 1 : 0) };
+    const folga = rodada % 3 === 2 ? 1 : 0; // a cada 3 rodadas, aceita uma curta a mais
+    perf = { ...perf, alvoDicas: perf.alvoDicas + 1, maxTres: (perf.maxTres ?? 99) + folga, maxQuatro: (perf.maxQuatro ?? 99) + 2 * folga };
     const g2 = gerarEsqueleto(rand, perf, 6000, g, travadas, 0.3);
     if (!g2) break;
     g = g2;

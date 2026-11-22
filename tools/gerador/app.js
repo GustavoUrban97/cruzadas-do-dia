@@ -3,7 +3,7 @@
 // (e o puzzles/index.json) na pasta puzzles/.
 
 import { NIVEIS, PERFIS, listaDoNivel } from './perfis.js';
-import { URL_FREQUENCIA, URL_DICIONARIO, CORINGAS, montarLista, lerProibidas } from './palavras.js';
+import { URL_FREQUENCIA, URL_DICIONARIO, CORINGAS, NOMES, montarLista, lerProibidas, formasVerbais } from './palavras.js';
 import { iniciarVariedade, gerarUma, pararVariedade } from './variedade.js';
 
 const $ = id => document.getElementById(id);
@@ -123,8 +123,10 @@ async function carregarBase(recarregar = false) {
     buscarTexto($('url-frequencia').value), buscarTexto($('url-dicionario').value), buscarTexto('proibidas.txt'),
   ]);
   estado.proibidas = lerProibidas(proib);
+  for (const nome of NOMES) estado.proibidas.delete(nome); // os nomes escolhidos a dedo valem
   estado.base = montarLista(freq, dic, estado.proibidas);
-  log(`${estado.base.length} palavras na lista (${estado.proibidas.size} proibidas).`);
+  estado.verbais = formasVerbais(estado.base, dic);
+  log(`${estado.base.length} palavras na lista (${estado.proibidas.size} proibidas, ${estado.verbais.size} formas verbais no fim da fila).`);
   return estado.base;
 }
 
@@ -183,7 +185,7 @@ function executar(fila, base, evitar) {
       if (!tarefa) { trabalhador.terminate(); if (--ativos === 0) resolver(); return; }
       // no conserto, as palavras trocadas não podem voltar
       const excluir = new Set(tarefa.conserto ? tarefa.conserto.ruins : []);
-      const lista = listaDoNivel(base, tarefa.nivel, evitar).filter(p => !excluir.has(p));
+      const lista = listaDoNivel(base, tarefa.nivel, evitar, estado.verbais).filter(p => !excluir.has(p));
       trabalhador.onmessage = ({ data: msg }) => {
         if (msg.log) return;
         if (msg.falhou) {

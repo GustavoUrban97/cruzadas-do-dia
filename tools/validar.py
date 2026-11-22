@@ -23,6 +23,7 @@ LARGURA, ALTURA = 13, 17
 DICA = "#"
 MAX_DICAS_POR_CASA = 2
 DICA_LONGA = 24  # caracteres; acima disso só avisa
+MAX_LACUNAS = 4  # dicas de completar ("___" ou "(?)") por puzzle; acima disso só avisa
 
 NIVEIS = ("facil", "media", "dificil")  # mesma ordem de js/niveis.js
 NOME_ARQUIVO = re.compile(r"^\d{4}-\d{2}-\d{2}-(facil|media|dificil)\.json$")
@@ -150,6 +151,11 @@ def validar_puzzle(caminho):
     repetidas = sorted(p for p, n in contagem.items() if n > 1)
     if repetidas:
         erros.append(f"palavra repetida no puzzle: {', '.join(repetidas)}")
+
+    # dica de completar ("___" ou "(?)"): poucas, como nas revistas (pedido de 21/11)
+    lacunas = sum(1 for d in dicas if "___" in str(d.get("texto", "")) or "(?)" in str(d.get("texto", "")))
+    if lacunas > MAX_LACUNAS:
+        avisos.append(f"{lacunas} dicas de completar (\"___\"); o ideal é no máximo {MAX_LACUNAS}")
 
     # banco (opcional): palavras de ajuda, todas precisam estar na grade
     banco = puzzle.get("banco", [])

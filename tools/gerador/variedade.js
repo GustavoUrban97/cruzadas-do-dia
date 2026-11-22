@@ -16,6 +16,7 @@
 // Apertar mais que isso trava o preenchimento (testado: a média não fecha).
 
 import { listaDoNivel, PERFIS } from './perfis.js';
+import { NOMES } from './palavras.js';
 
 const JANELA = 30;     // dias: palavras de 5+ letras não se repetem
 const VIZINHOS = 7;    // dias: contagem das curtas
@@ -53,11 +54,13 @@ async function lerPublicadas(inicio) {
   }
 }
 
-/** Duas formas da mesma palavra na grade, ou palavra proibida. Devolve o motivo ou null. */
-export function defeito(dicas) {
+/** Duas formas da mesma palavra na grade, palavra proibida ou nomes próprios demais. Devolve o motivo ou null. */
+export function defeito(dicas, nivel = null) {
   const ws = dicas.map(d => d.resposta);
   const proibida = ws.find(w => estado.proibidas && estado.proibidas.has(w));
   if (proibida) return `proibida ${proibida}`;
+  const nomes = ws.filter(w => NOMES.has(w));
+  if (nivel && nomes.length > (PERFIS[nivel].nomes ?? 0)) return `nomes demais: ${nomes.join(" ")}`;
   const curtos = [];
   for (const a of ws) for (const b of ws) {
     if (a >= b) continue;
@@ -136,7 +139,7 @@ export async function gerarUma(data, nivel, inicio, n = 8) {
   // as de 5–6 letras usadas há 15–30 dias só vão para o fim da fila: são as que
   // cruzam com tudo, e proibir todas trava a grade com palavras longas
   const { duro, mole } = evitarPara(arquivo, data);
-  const ordem = ordenar(listaDoNivel(estado.base, nivel, duro).filter(w => !FORA_DE_VEZ.has(w) && !duro.has(w)), data, arquivo);
+  const ordem = ordenar(listaDoNivel(estado.base, nivel, duro, estado.verbais).filter(w => !FORA_DE_VEZ.has(w) && !duro.has(w)), data, arquivo);
   const lista = [...ordem.filter(w => !mole.has(w)), ...ordem.filter(w => mole.has(w))];
   ultimaLista = lista;
   pararVariedade();
@@ -147,7 +150,7 @@ export async function gerarUma(data, nivel, inicio, n = 8) {
       ativos.push(w);
       w.onmessage = ({ data: m }) => {
         if (m.log || feito) return;
-        if (!m.falhou && defeito(m.pronto.dicas)) {
+        if (!m.falhou && defeito(m.pronto.dicas, nivel)) {
           // grade com defeito: descarta e põe outro trabalho no lugar
           w.terminate();
           if (++descartes <= 40) { lancar(); return; }
