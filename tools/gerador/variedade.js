@@ -83,22 +83,25 @@ export function defeito(dicas, nivel = null) {
     }
     const fins = new Set([a.at(-1), b.at(-1)]);
     if (curta.length >= 4 && a.length === b.length && a.slice(0, -1) === b.slice(0, -1) && fins.has('O') && fins.has('A')) return `${a}/${b}`;
-    // gênero e número com 5+ letras: EDITOR/EDITORA/EDITORES, AMARGO/AMARGAS
-    if (curta.length >= 5 && raiz(a).length >= 4 && raiz(a) === raiz(b)) return `${a}/${b}`;
+    // gênero e número com 4+ letras: EDITOR/EDITORA/EDITORES, AMARGO/AMARGAS, LISA/LISOS
+    if (curta.length >= 4 && raiz(a).length >= 3 && raiz(a) === raiz(b)) return `${a}/${b}`;
   }
   return null;
 }
 
-/** Tira plural e gênero: EDITORES → EDITOR, EDITORA → EDITOR, AMARGOS → AMARG. */
+/** Tira plural e gênero: EDITORES → EDITOR, EDITORA → EDITOR, AMARGOS → AMARG, LISOS → LIS. */
 function raiz(w) {
   if (w.endsWith('S')) w = w.slice(0, -1);
   if (w.endsWith('E') && 'RLZS'.includes(w.at(-2))) w = w.slice(0, -1);
-  if ((w.endsWith('A') || w.endsWith('O')) && w.length > 4) w = w.slice(0, -1);
+  if ((w.endsWith('A') || w.endsWith('O')) && w.length > 3) w = w.slice(0, -1);
   return w;
 }
 
-/** Formas de gênero e número a partir da raiz (sobram algumas que não existem; não faz mal). */
-const formas = w => { const r = raiz(w); return [w, ...['', 'S', 'A', 'AS', 'O', 'OS', 'E', 'ES'].map(f => r + f)]; };
+/**
+ * Formas de gênero e número a partir da raiz (sobram algumas que não existem; não faz mal).
+ * Só as de 5+ letras: bloquear as curtas (a "cola" da grade) trava o preenchimento.
+ */
+const formas = w => { const r = raiz(w); return [w, ...['', 'S', 'A', 'AS', 'O', 'OS', 'E', 'ES'].map(f => r + f)].filter(f => f.length >= 5); };
 
 /**
  * Palavras a evitar nesta cruzada (cada uma com o plural/singular):
