@@ -4,9 +4,11 @@
 //
 // Só contam a caneta e as letras digitadas (modo teclado). O lápis é rascunho,
 // e o que está nas casas de dica (riscar a dica resolvida) é ignorado.
-// O reconhecimento em si está em js/reconhecer.js.
+// O reconhecimento em si está em js/reconhecer.js; a memória das letras já
+// confirmadas neste aparelho, em js/memoria.js.
 
-import { carregarModelo, conferirCasa, tracosPorCasa } from './reconhecer.js';
+import { carregarModelo, conferirCasa, tracosPorCasa, ESPESSURA_PADRAO } from './reconhecer.js';
+import { obterMemoria } from './memoria.js';
 
 const MARCAS = ['marca-errada', 'marca-ilegivel', 'marca-vazia'];
 
@@ -31,10 +33,33 @@ export class Conferencia {
     }
   }
 
-  /** Carrega o modelo (sem pressa) e lê o que já estava escrito. */
+  /** Carrega o modelo e a memória de letras (sem pressa) e lê o que já estava escrito. */
   async preparar() {
     this.modelo = await carregarModelo();
+    await this.ligarMemoria();
     this.aoMudarTinta();
+  }
+
+  async ligarMemoria() {
+    if (this.memoria !== undefined) return;
+    this.memoria = null;
+    try {
+      this.memoria = await obterMemoria(this.modelo);
+    } catch (erro) {
+      console.warn(erro);
+      return;
+    }
+    this.memoria.ocupado = () => Boolean(this.tinta.gesto);
+    // a memória cresceu (ou foi refeita): lê de novo as casas já lidas
+    this.memoria.aoMudar = () => {
+      for (const [chave, lida] of this.lidas) { lida.res = null; this.pendentes.add(chave); }
+      this.agendar();
+    };
+  }
+
+  /** Uma cruzada foi resolvida: as casas dela entram na memória (em segundo plano). */
+  aprender() {
+    this.memoria?.atualizar();
   }
 
   /** Proporção altura/largura de cada casa como está na tela (a letra não deforma). */
@@ -95,7 +120,7 @@ export class Conferencia {
     const tracos = (porCasa || this.tracosAtuais()).get(chave);
     if (!tracos) { this.lidas.delete(chave); return; }
     const [l, c] = chave.split(',').map(Number);
-    lida.res = conferirCasa(this.modelo, tracos, this.puzzle.grade[l][c]);
+    lida.res = conferirCasa(this.modelo, tracos, this.puzzle.grade[l][c], ESPESSURA_PADRAO, this.memoria);
   }
 
   /**
@@ -104,6 +129,7 @@ export class Conferencia {
    */
   async conferir() {
     if (!this.modelo) this.modelo = await carregarModelo();
+    await this.ligarMemoria();
     this.aoMudarTinta();
     const porCasa = this.tracosAtuais();
     for (const chave of [...this.pendentes]) this.lerCasa(chave, porCasa); // termina o que faltava

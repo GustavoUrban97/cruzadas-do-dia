@@ -1,16 +1,19 @@
 // Persistência local no IndexedDB, uma entrada por puzzle (data + nível):
 //  - tinta:    os traços e as letras digitadas (modo teclado);
-//  - registro: o que aconteceu (terminei, avaliação do gabarito).
-// Chave das duas lojas: [data, nivel], ex.: ['2026-11-20', 'facil'].
+//  - registro: o que aconteceu (terminei, avaliação do gabarito);
+//  - memoria:  resumo das letras escritas nas cruzadas resolvidas (js/memoria.js).
+//    Sai da tinta e do registro, então não entra no backup: é refeita sozinha.
+// Chave das lojas: [data, nivel], ex.: ['2026-11-20', 'facil'].
 // Se o armazenamento falhar, o app continua funcionando (só não guarda),
 // e quem chama recebe o erro para avisar o usuário.
 
 const BANCO = 'cruzadas-do-dia';
-const VERSAO_BANCO = 3;          // 1: tinta · 2: + registro · 3: chave com nível
+const VERSAO_BANCO = 4;          // 1: tinta · 2: + registro · 3: chave com nível · 4: + memoria
 const CHAVE = ['data', 'nivel'];
 const NIVEL_ANTIGO = 'media';     // o que foi salvo antes dos três níveis vira "Média"
 const LOJA_TINTA = 'tinta';       // { data, nivel, tracos: [...], letras: {"l,c": "A"}, atualizado }
 const LOJA_REGISTRO = 'registro'; // { data, nivel, puzzle, terminei, termineiEm, avaliacao, avaliadoEm }
+const LOJA_MEMORIA = 'memoria';   // { data, nivel, modelo, tinta (atualizado), exemplos: [{ letra, resumo }] }
 
 let bancoAberto = null;
 
@@ -45,7 +48,7 @@ function abrir() {
     }
     // Cria o que falta e migra o que já existe (nada salvo se perde).
     pedido.onupgradeneeded = () => {
-      for (const loja of [LOJA_TINTA, LOJA_REGISTRO]) prepararLoja(pedido.result, pedido.transaction, loja);
+      for (const loja of [LOJA_TINTA, LOJA_REGISTRO, LOJA_MEMORIA]) prepararLoja(pedido.result, pedido.transaction, loja);
     };
     pedido.onsuccess = () => {
       const banco = pedido.result;
@@ -114,6 +117,22 @@ export function atualizarRegistro(data, nivel, mudancas) {
     };
     return null;
   }).then(() => novo);
+}
+
+// ---------- Memória de letras ----------
+
+/** Todas as entradas da memória de letras. */
+export function lerMemoria() {
+  return transacao(LOJA_MEMORIA, 'readonly', loja => loja.getAll());
+}
+
+export function gravarMemoria(item) {
+  return transacao(LOJA_MEMORIA, 'readwrite', loja => loja.put(item));
+}
+
+/** Apaga as entradas [data, nivel] da lista. */
+export function apagarMemoria(chaves) {
+  return transacao(LOJA_MEMORIA, 'readwrite', loja => { chaves.forEach(k => loja.delete(k)); return null; });
 }
 
 // ---------- Tudo de uma vez (histórico e backup) ----------

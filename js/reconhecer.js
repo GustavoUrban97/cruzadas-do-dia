@@ -46,7 +46,9 @@ async function lerModelo(pasta) {
   // as 26 letras e `grupo` diz a letra de cada saída.
   const classes = [...new Set(descricao.classes.toUpperCase())].join('');
   const grupo = Array.from(descricao.classes, l => classes.indexOf(l.toUpperCase()));
-  return { ...descricao, saidas: descricao.classes, classes, grupo, camadas };
+  // identifica o modelo (a memória de letras guarda resumos feitos por ele)
+  const assinatura = `${descricao.dados}|${descricao.precisao_teste}|${binario.byteLength}`;
+  return { ...descricao, saidas: descricao.classes, classes, grupo, camadas, assinatura };
 }
 
 function decodificarFloat16(bits) {
@@ -65,7 +67,16 @@ function decodificarFloat16(bits) {
 
 /** Roda a rede numa imagem 28×28 (Float32Array, fundo 0, tinta 1). Devolve as saídas (logits). */
 export function inferir(modelo, imagem) {
+  return inferirComResumo(modelo, imagem).logits;
+}
+
+/**
+ * Como inferir, e devolve também o "resumo" da letra: a penúltima camada da rede
+ * (depois do último ReLU), que serve para comparar com letras já confirmadas.
+ */
+export function inferirComResumo(modelo, imagem) {
   let x = imagem;
+  let resumo = null;
   let [c, h, w] = modelo.entrada;
   for (const camada of modelo.camadas) {
     if (camada.tipo === 'conv') {
@@ -73,6 +84,7 @@ export function inferir(modelo, imagem) {
       c = camada.saida;
     } else if (camada.tipo === 'relu') {
       for (let i = 0; i < x.length; i++) if (x[i] < 0) x[i] = 0;
+      resumo = x;
     } else if (camada.tipo === 'pool') {
       x = pool2x2(x, c, h, w);
       h = Math.floor(h / 2); w = Math.floor(w / 2);
@@ -80,7 +92,7 @@ export function inferir(modelo, imagem) {
       x = densa(x, camada);
     } // 'achatar': x já está na ordem canal, linha, coluna
   }
-  return x;
+  return { logits: x, resumo };
 }
 
 // Convolução 3×3 com borda de zeros. A entrada ganha a borda uma vez (sem testes
@@ -313,9 +325,16 @@ export function conferirLetra(modelo, probs, esperada) {
   };
 }
 
-/** Atalho: traços de uma casa -> resultado da conferência (ou null se a casa está vazia). */
-export function conferirCasa(modelo, tracosDaCasa, esperada, espessura = ESPESSURA_PADRAO) {
+/**
+ * Atalho: traços de uma casa -> resultado da conferência (ou null se a casa está vazia).
+ * Com a `memoria` (js/memoria.js), a leitura também compara a letra com as já
+ * confirmadas neste aparelho.
+ */
+export function conferirCasa(modelo, tracosDaCasa, esperada, espessura = ESPESSURA_PADRAO, memoria = null) {
   const imagem = rasterizar(tracosDaCasa, espessura);
   if (!imagem) return null;
-  return { ...conferirLetra(modelo, probabilidades(inferir(modelo, imagem), modelo), esperada), imagem };
+  const { logits, resumo } = inferirComResumo(modelo, imagem);
+  let probs = probabilidades(logits, modelo);
+  if (memoria) probs = memoria.ajustar(probs, resumo);
+  return { ...conferirLetra(modelo, probs, esperada), imagem };
 }

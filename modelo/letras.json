@@ -1,15 +1,15 @@
 {
  "versao": 1,
- "dados": "EMNIST Letters (NIST)",
+ "dados": "EMNIST ByMerge (NIST), s\u00f3 letras",
  "formato": "float16-le",
  "entrada": [
   1,
   28,
   28
  ],
- "classes": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
- "precisao_teste": 0.9453,
- "precisao_teste_top3": 0.995,
+ "classes": "ABCDEFGHIJKLMNOPQRSTUVWXYZabdefghnqrt",
+ "precisao_teste": 0.951,
+ "precisao_teste_top3": 0.996,
  "camadas": [
   {
    "tipo": "conv",
@@ -93,14 +93,14 @@
   {
    "tipo": "densa",
    "entrada": 128,
-   "saida": 26,
+   "saida": 37,
    "pesos": {
     "inicio": 129600,
-    "tamanho": 3328
+    "tamanho": 4736
    },
    "vies": {
-    "inicio": 132928,
-    "tamanho": 26
+    "inicio": 134336,
+    "tamanho": 37
    }
   }
  ]
