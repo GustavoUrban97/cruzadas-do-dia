@@ -161,6 +161,10 @@ class Rede(nn.Module):
 def carregar():
     base = [transforms.ToTensor(), Desvirar()]
     treino_tf = transforms.Compose(base + [
+        # deformação elástica: entorta a letra de leve e ao acaso (o topo do A
+        # fica redondo ou pontudo, a barra inclina), para aceitar jeitos de
+        # escrever que não estão no EMNIST
+        transforms.RandomApply([transforms.ElasticTransform(alpha=40.0, sigma=5.0)], p=0.5),
         transforms.RandomAffine(degrees=12, translate=(0.08, 0.08), scale=(0.85, 1.1), shear=12),
         EspessuraAleatoria(),
     ])

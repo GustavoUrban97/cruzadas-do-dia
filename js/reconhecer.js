@@ -20,27 +20,33 @@ const PASTA_MODELO = new URL('../modelo/', import.meta.url);
 
 let modeloPromessa = null;
 
-/** Carrega (uma vez) a descrição e os pesos do modelo. */
-export function carregarModelo() {
+/**
+ * Carrega (uma vez) a descrição e os pesos do modelo. `pasta` (opcional, URL)
+ * carrega outro modelo, sem guardar, para comparar nas ferramentas de teste.
+ */
+export function carregarModelo(pasta = null) {
+  if (pasta) return lerModelo(pasta);
   if (!modeloPromessa) {
-    modeloPromessa = (async () => {
-      const [descricao, binario] = await Promise.all([
-        fetch(new URL('letras.json', PASTA_MODELO)).then(r => { if (!r.ok) throw new Error(`modelo: HTTP ${r.status}`); return r.json(); }),
-        fetch(new URL('letras.bin', PASTA_MODELO)).then(r => { if (!r.ok) throw new Error(`modelo: HTTP ${r.status}`); return r.arrayBuffer(); }),
-      ]);
-      const pesos = decodificarFloat16(new Uint16Array(binario));
-      const pegar = ({ inicio, tamanho }) => pesos.subarray(inicio, inicio + tamanho);
-      const camadas = descricao.camadas.map(c => (c.pesos ? { ...c, w: pegar(c.pesos), b: pegar(c.vies) } : c));
-      // A rede pode ter mais de uma saída por letra (maiúscula e minúscula de
-      // desenho diferente, como A e a): `saidas` são as saídas da rede, `classes`
-      // as 26 letras e `grupo` diz a letra de cada saída.
-      const classes = [...new Set(descricao.classes.toUpperCase())].join('');
-      const grupo = Array.from(descricao.classes, l => classes.indexOf(l.toUpperCase()));
-      return { ...descricao, saidas: descricao.classes, classes, grupo, camadas };
-    })();
+    modeloPromessa = lerModelo(PASTA_MODELO);
     modeloPromessa.catch(() => { modeloPromessa = null; });
   }
   return modeloPromessa;
+}
+
+async function lerModelo(pasta) {
+  const [descricao, binario] = await Promise.all([
+    fetch(new URL('letras.json', pasta)).then(r => { if (!r.ok) throw new Error(`modelo: HTTP ${r.status}`); return r.json(); }),
+    fetch(new URL('letras.bin', pasta)).then(r => { if (!r.ok) throw new Error(`modelo: HTTP ${r.status}`); return r.arrayBuffer(); }),
+  ]);
+  const pesos = decodificarFloat16(new Uint16Array(binario));
+  const pegar = ({ inicio, tamanho }) => pesos.subarray(inicio, inicio + tamanho);
+  const camadas = descricao.camadas.map(c => (c.pesos ? { ...c, w: pegar(c.pesos), b: pegar(c.vies) } : c));
+  // A rede pode ter mais de uma saída por letra (maiúscula e minúscula de
+  // desenho diferente, como A e a): `saidas` são as saídas da rede, `classes`
+  // as 26 letras e `grupo` diz a letra de cada saída.
+  const classes = [...new Set(descricao.classes.toUpperCase())].join('');
+  const grupo = Array.from(descricao.classes, l => classes.indexOf(l.toUpperCase()));
+  return { ...descricao, saidas: descricao.classes, classes, grupo, camadas };
 }
 
 function decodificarFloat16(bits) {
