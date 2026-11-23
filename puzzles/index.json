@@ -1,45 +1,5 @@
 {
   "datas": {
-    "2026-11-07": [
-      "facil",
-      "media",
-      "dificil"
-    ],
-    "2026-11-16": [
-      "facil",
-      "media",
-      "dificil"
-    ],
-    "2026-11-17": [
-      "facil",
-      "media",
-      "dificil"
-    ],
-    "2026-11-18": [
-      "facil",
-      "media",
-      "dificil"
-    ],
-    "2026-11-19": [
-      "facil",
-      "media",
-      "dificil"
-    ],
-    "2026-11-20": [
-      "facil",
-      "media",
-      "dificil"
-    ],
-    "2026-11-21": [
-      "facil",
-      "media",
-      "dificil"
-    ],
-    "2026-11-22": [
-      "facil",
-      "media",
-      "dificil"
-    ],
     "2026-11-23": [
       "facil",
       "media",
@@ -64,6 +24,14 @@
       "facil",
       "media",
       "dificil"
+    ],
+    "2026-12-17": [
+      "facil",
+      "media",
+      "dificil"
     ]
+  },
+  "temas": {
+    "2026-12-17": "Vingadores: Doutor Destino"
   }
 }

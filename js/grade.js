@@ -100,12 +100,13 @@ export function renderizarBanco(elemento, puzzle) {
   const tema = puzzle.tema && typeof puzzle.tema.nome === 'string' ? puzzle.tema.nome : '';
   elemento.replaceChildren();
   elemento.hidden = palavras.length === 0 && !tema;
-  // Dia com tema: o nome do tema fica à esquerda, de pé (o banco continua de ponta-cabeça).
+  // Dia com tema: "★ nome do tema" à esquerda, de pé (o banco continua de ponta-cabeça).
   elemento.classList.toggle('com-tema', Boolean(tema));
   if (tema) {
     const rotulo = document.createElement('em');
     rotulo.className = 'tema';
-    rotulo.textContent = `Tema: ${tema}`;
+    rotulo.textContent = `★ ${tema}`;
+    rotulo.title = `Tema do dia: ${tema}`;
     elemento.append(rotulo);
   }
   if (!palavras.length) return;
