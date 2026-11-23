@@ -224,7 +224,10 @@ def main():
         for data, niveis in sorted(niveis_por_data.items())
     }
     total = sum(len(n) for n in indice.values())
-    conteudo = json.dumps({"datas": indice}, ensure_ascii=False, indent=2) + "\n"
+    saida = {"datas": indice}
+    if temas:
+        saida["temas"] = dict(sorted(temas.items()))
+    conteudo = json.dumps(saida, ensure_ascii=False, indent=2) + "\n"
     INDICE.write_text(conteudo, encoding="utf-8", newline="\n")
     print(f"\n{total} puzzle(s) válido(s) em {len(indice)} dia(s). puzzles/index.json atualizado.")
     return 0
