@@ -136,9 +136,10 @@ export function calcularEstatisticas(estados, hoje, conferencias = new Map()) {
  *  - antesDeLer():  grava a tinta aberta, para o dia atual entrar na conta;
  *  - nivel:         nível aberto (a aba que aparece primeiro);
  *  - irPara(data, nivel): abre o puzzle daquele dia e nível;
- *  - aoImportar():  chamado depois de importar (a página para de salvar e recarrega).
+ *  - aoImportar():  chamado depois de importar (a página para de salvar e recarrega);
+ *  - temas:         { data: nome do tema } (do puzzles/index.json), marcados no calendário.
  */
-export function iniciarHistorico({ hoje, nivel, antesDeLer, irPara, aoImportar }) {
+export function iniciarHistorico({ hoje, nivel, antesDeLer, irPara, aoImportar, temas = {} }) {
   const painel = $('historico');
   const abas = [...document.querySelectorAll('[data-aba-nivel]')];
   let aba = nivel;       // nível mostrado no painel
@@ -147,6 +148,7 @@ export function iniciarHistorico({ hoje, nivel, antesDeLer, irPara, aoImportar }
   let estados = new Map();
   let conferencias = new Map(); // data -> em quantas conferências resolveu
   let primeiroMes = null;
+  $('legenda-tema').hidden = Object.keys(temas).length === 0;
 
   const mostrarAba = novaAba => {
     aba = novaAba;
@@ -207,10 +209,11 @@ export function iniciarHistorico({ hoje, nivel, antesDeLer, irPara, aoImportar }
       const estado = estados.get(dia);
       if (estado) botao.classList.add(`estado-${estado}`);
       if (dia === diaDeHoje) botao.classList.add('hoje');
+      if (temas[dia]) botao.classList.add('com-tema');
       if (dia > diaDeHoje) {
         botao.disabled = true;
       } else {
-        botao.title = `${dataCurta(dia)} (${NOMES_NIVEIS[aba]}): ${rotuloDoDia(estado, conferencias.get(dia))}`;
+        botao.title = `${dataCurta(dia)} (${NOMES_NIVEIS[aba]}): ${rotuloDoDia(estado, conferencias.get(dia))}${temas[dia] ? ` · tema: ${temas[dia]}` : ""}`;
         const destino = dia;
         botao.addEventListener('click', () => { painel.close(); irPara(destino, aba); });
       }

@@ -13,7 +13,7 @@ import { carregarTinta, salvarTinta, pedirPersistencia, carregarRegistro, atuali
 // Versão do app, mostrada discretamente no cabeçalho.
 // IMPORTANTE: precisa ser igual à VERSAO de sw.js, que deve subir a cada mudança
 // em HTML/CSS/JS (é o que faz o tablet perceber que há versão nova).
-const VERSAO = 20;
+const VERSAO = 21;
 
 // Celular (tela estreita): sem caneta, o jogo é só pelo modo teclado.
 // O mesmo limite está no CSS (@media max-width: 599px).
@@ -514,7 +514,7 @@ async function iniciar() {
   }
 
   try {
-    const { datas: indice } = await buscarJSON('puzzles/index.json');
+    const { datas: indice, temas = {} } = await buscarJSON('puzzles/index.json');
     if (!indice || Array.isArray(indice) || Object.keys(indice).length === 0) {
       throw new Error('puzzles/index.json está vazio ou no formato antigo');
     }
@@ -529,6 +529,10 @@ async function iniciar() {
         `mostrando a de ${dataCurta(dataDoArquivo)}. O banco precisa de puzzles novos.`);
     }
 
+    // Dia com tema: as casas de dica (e a faixa da dica) ganham a cor do tema.
+    if (puzzle.tema && /^#[0-9a-f]{6}$/i.test(puzzle.tema.cor || '')) {
+      document.documentElement.style.setProperty('--casa-dica', puzzle.tema.cor);
+    }
     renderizarGrade($('grade'), puzzle);
     renderizarBanco($('banco'), puzzle);
     if (data < hoje()) colocarGabarito($('grade'), puzzle); // como no jornal: só no dia seguinte
@@ -618,6 +622,7 @@ async function iniciar() {
       nivel,
       antesDeLer: () => salvar(),
       irPara: (d, n) => irPara(d, n),
+      temas,
       aoImportar: async gravarBackup => {
         // Para de salvar a tinta aberta, senão ela gravaria por cima do puzzle importado.
         await salvar();

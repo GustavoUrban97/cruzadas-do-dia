@@ -3,7 +3,7 @@
 // (e o puzzles/index.json) na pasta puzzles/.
 
 import { NIVEIS, PERFIS, listaDoNivel } from './perfis.js';
-import { URL_FREQUENCIA, URL_DICIONARIO, CORINGAS, NOMES, montarLista, lerProibidas, formasVerbais } from './palavras.js';
+import { URL_FREQUENCIA, URL_DICIONARIO, CORINGAS, NOMES, montarLista, lerProibidas, formasVerbais, normalizar } from './palavras.js';
 import { iniciarVariedade, gerarUma, pararVariedade } from './variedade.js';
 
 const $ = id => document.getElementById(id);
@@ -14,6 +14,8 @@ const MIN_SEM_REPETIR = 5;     // palavras com 5+ letras não se repetem no mês
 const estado = {
   base: null,          // lista geral de palavras
   indice: {},          // puzzles/index.json atual: { data: [níveis] }
+  temasPublicados: {}, // puzzles/index.json atual: { data: nome do tema }
+  temas: {},           // tools/temas.json: { "AAAA-MM-DD" ou "MM-DD": tema }
   puzzles: new Map(),  // "AAAA-MM-DD-nivel" -> puzzle gerado
   trabalhadores: [],
 };
@@ -52,6 +54,22 @@ function titulo(data, nivel) {
   if (nivel === 'facil') return `${nome} ${fimDeSemana ? 'tranquilo' : 'tranquila'}`;
   if (nivel === 'media') return fimDeSemana ? nome : `${nome}-feira`;
   return `${nome} de mestre`;
+}
+
+/**
+ * Tema do dia (tools/temas.json), pela data exata ou, para os que voltam todo
+ * ano, por "MM-DD". Devolve null se o dia não tem tema.
+ */
+export function temaDe(data) {
+  const t = estado.temas[data] || estado.temas[data.slice(5)];
+  if (!t || !Array.isArray(t.palavras)) return null;
+  return { ...t, palavras: t.palavras.map(normalizar) };
+}
+
+/** Título: o do tema (texto ou { nivel: texto }), senão o do dia da semana. */
+function tituloDo(data, nivel, tema) {
+  const t = tema && tema.titulo;
+  return (typeof t === 'string' ? t : t && t[nivel]) || titulo(data, nivel);
 }
 
 /** Semente a partir do nome do arquivo: o mesmo dia e nível gera o mesmo puzzle. */
@@ -94,6 +112,7 @@ export function serializar(p) {
   return '{\n' +
     `  "id": ${p.id},\n  "data": "${p.data}",\n  "nivel": "${p.nivel}",\n` +
     `  "titulo": ${JSON.stringify(p.titulo)},\n  "autor": ${JSON.stringify(p.autor)},\n` +
+    (p.tema ? `  "tema": ${JSON.stringify(p.tema).replace(/":/g, '": ').replace(/,"/g, ', "')},\n` : '') +
     '  "largura": 13,\n  "altura": 17,\n  "grade": [\n' +
     p.grade.map(l => `    "${l}"`).join(',\n') + '\n  ],\n' +
     (banco.length ? `  "banco": ${JSON.stringify(banco).replace(/,/g, ', ')},\n` : '') +
@@ -111,7 +130,12 @@ function indiceAtualizado() {
   }
   const ordenado = {};
   for (const d of Object.keys(datas).sort()) ordenado[d] = datas[d].sort((a, b) => NIVEIS.indexOf(a) - NIVEIS.indexOf(b));
-  return JSON.stringify({ datas: ordenado }, null, 2) + '\n';
+  // "temas" (data -> nome) só se algum dia tiver tema, como no validar.py
+  const temas = { ...estado.temasPublicados };
+  for (const p of estado.puzzles.values()) if (p.tema) temas[p.data] = p.tema.nome;
+  const saida = { datas: ordenado };
+  if (Object.keys(temas).length) saida.temas = Object.fromEntries(Object.keys(temas).sort().map(d => [d, temas[d]]));
+  return JSON.stringify(saida, null, 2) + '\n';
 }
 
 // ---------- Dados existentes ----------
@@ -126,13 +150,16 @@ async function carregarBase(recarregar = false) {
   for (const nome of NOMES) estado.proibidas.delete(nome); // os nomes escolhidos a dedo valem
   estado.base = montarLista(freq, dic, estado.proibidas);
   estado.verbais = formasVerbais(estado.base, dic);
+  try { estado.temas = JSON.parse(await buscarTexto('temas.json')); } catch { estado.temas = {}; }
   log(`${estado.base.length} palavras na lista (${estado.proibidas.size} proibidas, ${estado.verbais.size} formas verbais no fim da fila).`);
   return estado.base;
 }
 
 /** Lê os puzzles já publicados: maior id e palavras usadas perto das datas do lote. */
 async function lerExistentes(inicio, dias) {
-  estado.indice = (JSON.parse(await buscarTexto('../puzzles/index.json')).datas) || {};
+  const indice = JSON.parse(await buscarTexto('../puzzles/index.json'));
+  estado.indice = indice.datas || {};
+  estado.temasPublicados = indice.temas || {};
   let maiorId = 0;
   const recentes = new Set();
   const desde = somarDias(inicio, -JANELA_SEM_REPETIR);
@@ -268,9 +295,15 @@ function gerar() {
         if (estado.puzzles.has(arquivo)) continue; // já gerada neste lote
         const t0 = Date.now();
         let p = null;
-        for (let tentativa = 0; tentativa < 3 && !p && !parado; tentativa++) p = await gerarUma(data, nivel, inicio);
+        const tema = temaDe(data);
+        if (tema) log(`${arquivo}: dia com tema (${tema.nome}).`);
+        for (let tentativa = 0; tentativa < 3 && !p && !parado; tentativa++) p = await gerarUma(data, nivel, inicio, 8, tema);
         if (!p) { log(`${arquivo}: não consegui gerar.`); continue; }
-        estado.puzzles.set(arquivo, { id: proximoId++, data, nivel, titulo: titulo(data, nivel), autor: 'Gustavo', semente: p.semente, grade: p.grade, dicas: p.dicas });
+        estado.puzzles.set(arquivo, {
+          id: proximoId++, data, nivel, titulo: tituloDo(data, nivel, tema), autor: 'Gustavo',
+          ...(tema && { tema: { nome: tema.nome, ...(tema.cor && { cor: tema.cor }) } }),
+          semente: p.semente, grade: p.grade, dicas: p.dicas,
+        });
         guardarLote();
         desenhar();
         log(`${arquivo}: pronta em ${((Date.now() - t0) / 1000).toFixed(0)} s (${p.dicas.length} palavras). Confira se não há nome próprio ou estrangeirismo.`);
@@ -420,6 +453,6 @@ async function iniciar() {
 }
 
 // Para automação/testes pelo console.
-window.gerador = { estado, gerar, refazerProibidas, aplicarDicas, palavrasSemDica, serializar, indiceAtualizado, escolherBanco, carregarBase, resumoRepeticoes };
+window.gerador = { estado, temaDe, gerar, refazerProibidas, aplicarDicas, palavrasSemDica, serializar, indiceAtualizado, escolherBanco, carregarBase, resumoRepeticoes };
 
 iniciar();

@@ -14,6 +14,8 @@
 //  - grade com palavra proibida ou com duas formas da mesma palavra (AMARELO/
 //    AMARELA, MAR/MARES, EDITOR/EDITORES; tolera um par de 3 letras, como ASA/ASAS)
 //    é descartada; o gênero e o número também valem entre as cruzadas do lote.
+//  - dia com tema (tools/temas.json): parte das palavras-tema é plantada na grade
+//    antes de preencher, e ela precisa ter de "minimo" a "maximo" delas (senão é descartada).
 // Apertar mais que isso trava o preenchimento (testado: a média não fecha).
 
 import { listaDoNivel, PERFIS } from './perfis.js';
@@ -57,11 +59,17 @@ async function lerPublicadas(inicio) {
 }
 
 /** Duas formas da mesma palavra na grade, palavra proibida ou nomes próprios demais. Devolve o motivo ou null. */
-export function defeito(dicas, nivel = null) {
+export function defeito(dicas, nivel = null, tema = null) {
   const ws = dicas.map(d => d.resposta);
-  const proibida = ws.find(w => estado.proibidas && estado.proibidas.has(w));
+  const doTema = w => Boolean(tema && tema.todas.has(w)); // as palavras-tema valem mesmo se proibidas ou nomes
+  const proibida = ws.find(w => !doTema(w) && estado.proibidas && estado.proibidas.has(w));
   if (proibida) return `proibida ${proibida}`;
-  const nomes = ws.filter(w => NOMES.has(w));
+  if (tema) {
+    const n = ws.filter(doTema).length;
+    if (n < tema.minimo) return `tema: só ${n} de ${tema.minimo}`;
+    if (n > tema.maximo) return `tema: ${n}, mais que ${tema.maximo}`;
+  }
+  const nomes = ws.filter(w => NOMES.has(w) && !doTema(w));
   if (nivel && nomes.length > (PERFIS[nivel].nomes ?? 0)) return `nomes demais: ${nomes.join(" ")}`;
   const curtos = [];
   for (const a of ws) for (const b of ws) {
@@ -149,17 +157,45 @@ function ordenar(lista, data, arquivo) {
 export function pararVariedade() { ativos.forEach(w => w.terminate()); ativos = []; }
 
 /**
+ * Palavras-tema desta cruzada (dia com tema, tools/temas.json). Uma parte
+ * sorteada é plantada na grade antes de preencher (esqueleto.js, semear) e vai
+ * para a frente da fila; as outras ficam no lugar de sempre (tirá-las da lista
+ * trava a grade: muitas são curtas comuns, como ARCO). As de 5+ letras já usadas
+ * noutro nível do dia não entram; a regra do mês não vale para elas.
+ *  - tema: { palavras: [...], minimo: { nivel: n }, maximo: { nivel: n } }.
+ */
+function palavrasDoTema(tema, arquivo, nivel) {
+  const doLote = new Set();
+  for (const [a, p] of estado.puzzles) if (a !== arquivo) p.dicas.forEach(d => d.resposta.length >= 5 && formas(d.resposta).forEach(f => doLote.add(f)));
+  const todas = new Set(tema.palavras);
+  const livres = [...todas].filter(w => w.length >= 2 && w.length <= PERFIS[nivel].maxLetras && !doLote.has(w) && !FORA_DE_VEZ.has(w));
+  for (let i = livres.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [livres[i], livres[j]] = [livres[j], livres[i]]; }
+  // as de 4–7 letras primeiro: cruzam melhor (as longas, com letras fixas, travam a grade)
+  livres.sort((a, b) => (a.length < 4 || a.length > 7) - (b.length < 4 || b.length > 7));
+  const minimo = tema.minimo?.[nivel] ?? 4;
+  return { todas, frente: livres.slice(0, 3 * minimo), minimo, maximo: tema.maximo?.[nivel] ?? minimo + 4 };
+}
+
+/**
  * Gera uma cruzada (data + nível) com n trabalhos em paralelo. Devolve o
  * puzzle (sem id nem título) ou null se nenhum trabalho conseguiu.
+ * tema (opcional): ver palavrasDoTema; a grade precisa ter de minimo a maximo palavras-tema.
  */
-export async function gerarUma(data, nivel, inicio, n = 8) {
+export async function gerarUma(data, nivel, inicio, n = 8, tema = null) {
   await lerPublicadas(inicio);
   const arquivo = `${data}-${nivel}`;
   // as de 5–6 letras usadas há 15–30 dias só vão para o fim da fila: são as que
   // cruzam com tudo, e proibir todas trava a grade com palavras longas
   const { duro, mole } = evitarPara(arquivo, data);
   const ordem = ordenar(listaDoNivel(estado.base, nivel, duro, estado.verbais).filter(w => !FORA_DE_VEZ.has(w) && !duro.has(w)), data, arquivo);
-  const lista = [...ordem.filter(w => !mole.has(w)), ...ordem.filter(w => mole.has(w))];
+  let lista = [...ordem.filter(w => !mole.has(w)), ...ordem.filter(w => mole.has(w))];
+  const doTema = tema && palavrasDoTema(tema, arquivo, nivel);
+  // todas as palavras-tema na frente da fila (sem tirar nenhuma da lista), as plantadas primeiro
+  if (doTema) {
+    const frente = [...new Set([...doTema.frente, ...doTema.todas])].filter(w => w.length <= PERFIS[nivel].maxLetras);
+    const naFrente = new Set(frente);
+    lista = [...frente, ...lista.filter(w => !naFrente.has(w))];
+  }
   ultimaLista = lista;
   pararVariedade();
   return new Promise(resolver => {
@@ -169,7 +205,7 @@ export async function gerarUma(data, nivel, inicio, n = 8) {
       ativos.push(w);
       w.onmessage = ({ data: m }) => {
         if (m.log || feito) return;
-        const motivo = !m.falhou && defeito(m.pronto.dicas, nivel);
+        const motivo = !m.falhou && defeito(m.pronto.dicas, nivel, doTema);
         if (motivo) {
           descartados.push(`${arquivo}: ${motivo}`);
           // grade com defeito: descarta e põe outro trabalho no lugar
@@ -182,7 +218,8 @@ export async function gerarUma(data, nivel, inicio, n = 8) {
         pararVariedade();
         resolver({ data, nivel, semente: m.pronto.semente, grade: m.pronto.grade, dicas: m.pronto.dicas, descartes });
       };
-      w.postMessage({ id: arquivo, lista, perfil: PERFIS[nivel], semente: Math.floor(Math.random() * 1e8), tentativas: 400 });
+      w.postMessage({ id: arquivo, lista, perfil: PERFIS[nivel], semente: Math.floor(Math.random() * 1e8), tentativas: 400,
+        tema: doTema ? { palavras: doTema.frente, quantas: Math.max(2, doTema.minimo - 1), todas: [...doTema.todas] } : null });
     };
     for (let k = 0; k < n; k++) lancar();
   });

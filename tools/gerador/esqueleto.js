@@ -6,6 +6,8 @@ export const L = 13, A = 17;
 // Quanto a folga nas cruzadas pesa contra a preferência da lista ao escolher a palavra.
 export let PESO_FOLGA = 3;
 export const pesoFolga = v => { PESO_FOLGA = v; };
+// Quanto uma palavra-tema (dia com tema) passa na frente das outras candidatas.
+const BONUS_TEMA = 40;
 
 /** Gerador pseudoaleatório com semente (mulberry32): mesma semente, mesmo puzzle. */
 export function rng(semente) {
@@ -138,7 +140,7 @@ export function gerarEsqueleto(rand, perfil, passos = 40000, inicial = null, tra
  * Preenche o esqueleto com palavras da lista (busca com retrocesso; escolhe
  * sempre a vaga com menos opções). A lista vem em ordem de preferência.
  */
-export function preencher(g, palavras, rand, limiteNos = 80000, inicial = null) {
+export function preencher(g, palavras, rand, limiteNos = 80000, inicial = null, preferidas = null) {
   const vagas = sequencias(g).filter(s => s.casas.length >= 2);
   const ind = indexar(palavras);
   // inicial: letras já fixas (conserto local); vagas completas não mudam
@@ -209,7 +211,8 @@ export function preencher(g, palavras, rand, limiteNos = 80000, inicial = null) 
       }
       ind.bloquear(p, -1);
       for (const [r, c] of novas) atual[r][c] = '';
-      if (folga >= 0) avaliadas.push([id, k * (0.3 + rand()) - PESO_FOLGA * folga]);
+      // dia com tema: palavra-tema que cabe passa na frente (se não travar as cruzadas)
+      if (folga >= 0) avaliadas.push([id, k * (0.3 + rand()) - PESO_FOLGA * folga - (preferidas && preferidas.has(p) ? BONUS_TEMA : 0)]);
     });
     if (!avaliadas.length) falhas[melhor]++;
     const ordem = avaliadas.sort((a, b) => a[1] - b[1]).map(x => x[0]).slice(0, 12);
@@ -352,15 +355,18 @@ export function montar(g, letras) {
  * só para onde fazem falta e o resto da grade fica com palavras longas.
  * Devolve { g, letras, reparos } ou null.
  */
-export function gerarCruzada(rand, perfil, lista, { tentativas = 4, reparos = 10, nos = 1500 } = {}) {
+export function gerarCruzada(rand, perfil, lista, { tentativas = 4, reparos = 10, nos = 1500, tema = null } = {}) {
   let g = gerarEsqueleto(rand, perfil);
   if (!g) return null;
   const travadas = new Set();
   let perf = { ...perfil };
   for (let rodada = 0; rodada <= reparos; rodada++) {
     const soma = new Map();
+    // dia com tema: o mesmo plantio em todas as tentativas da rodada (o reparo
+    // precisa ver as falhas no mesmo lugar para saber onde pôr a casa de dica)
+    const inicial = tema ? semear(g, tema.palavras, tema.quantas, rand, lista) : null;
     for (let k = 0; k < tentativas; k++) {
-      const r = preencher(g, lista, rand, nos);
+      const r = preencher(g, lista, rand, nos, inicial, tema && tema.preferidas);
       if (r.ok) return { g, letras: r.letras, reparos: rodada };
       for (const f of r.falhas) {
         if (!f.n || f.casas.length < 3) continue;
@@ -391,4 +397,52 @@ export function gerarCruzada(rand, perfil, lista, { tentativas = 4, reparos = 10
     g = g2;
   }
   return null;
+}
+
+/**
+ * Dia com tema: planta palavras-tema em vagas sorteadas do tamanho certo, antes
+ * de preencher (na frente da fila elas quase nunca cabem nas vagas já cruzadas).
+ * As plantadas ficam espalhadas: nenhuma vaga cruzada passa por duas delas
+ * (palavras-tema coladas lado a lado travam o preenchimento). Devolve as
+ * letras (A×L, '' nas casas livres) para o "inicial" de preencher.
+ */
+export function semear(g, palavras, quantas, rand, lista) {
+  const atual = Array.from({ length: A }, () => Array(L).fill(''));
+  const vagas = sequencias(g).filter(s => s.casas.length >= 2);
+  const usadas = new Set(), vetadas = new Set();
+  const porTamanho = {};
+  for (const w of lista) (porTamanho[w.length] ||= []).push(w);
+  // a vaga ainda tem ao menos 5 palavras que cabem (com as letras já plantadas)?
+  const temOpcoes = o => {
+    const padrao = o.casas.map(([r, c]) => atual[r][c]);
+    let n = 0;
+    for (const w of porTamanho[padrao.length] || []) if (padrao.every((ch, k) => !ch || ch === w[k]) && ++n >= 5) return true;
+    return false;
+  };
+  const ordem = palavras.slice();
+  for (let i = ordem.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ordem[i], ordem[j]] = [ordem[j], ordem[i]]; }
+  // a vaga perpendicular que passa por (r, c) já tem letra plantada?
+  const cruzaPlantada = (r, c, dir) => vagas.some(o => o.dir !== dir && o.casas.some(([rr, cc]) => rr === r && cc === c) &&
+    o.casas.some(([rr, cc]) => atual[rr][cc]));
+  let postas = 0;
+  for (const p of ordem) {
+    if (postas >= quantas) break;
+    if (vetadas.has(p)) continue; // variante de uma já plantada (JOIA/JOIAS)
+    const cabem = vagas.filter((v, i) => !usadas.has(i) && v.casas.length === p.length &&
+      v.casas.every(([r, c]) => !cruzaPlantada(r, c, v.dir)));
+    // sorteia uma vaga; desiste dela se alguma vaga cruzada ficar sem opção
+    for (let i = cabem.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [cabem[i], cabem[j]] = [cabem[j], cabem[i]]; }
+    for (const v of cabem) {
+      v.casas.forEach(([r, c], k) => { atual[r][c] = p[k]; });
+      const cruzadas = vagas.filter(o => o.dir !== v.dir && o.casas.some(([r, c]) => v.casas.some(([rr, cc]) => rr === r && cc === c)));
+      if (cruzadas.every(temOpcoes)) {
+        usadas.add(vagas.indexOf(v));
+        variantes(p).forEach(x => vetadas.add(x));
+        postas++;
+        break;
+      }
+      v.casas.forEach(([r, c]) => { atual[r][c] = ''; });
+    }
+  }
+  return atual;
 }

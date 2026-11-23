@@ -302,6 +302,15 @@ body {
 .cal-dia.estado-terminei { background: var(--papel); border-color: var(--tinta-suave); border-style: dashed; }
 .cal-dia.estado-terminei { border-color: var(--acertei); }
 .cal-dia.hoje { box-shadow: 0 0 0 2px var(--papel), 0 0 0 3.5px var(--linha); font-weight: 700; }
+.cal-dia.com-tema { position: relative; }
+.cal-dia.com-tema::after {
+  content: '★';
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font-size: 0.55rem;
+  line-height: 1;
+}
 
 .legenda { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; margin-top: 0.6rem; font-size: 0.75rem; }
 .legenda i {
@@ -439,6 +448,26 @@ body {
 }
 
 .banco b { font-weight: 700; letter-spacing: 0.1em; }
+
+/* Dia com tema: o nome do tema à esquerda, de pé; o banco à direita. */
+.banco.com-tema {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.8rem;
+}
+.banco .tema {
+  font-family: var(--serifa);
+  font-style: italic;
+  letter-spacing: 0.02em;
+  color: var(--tinta);
+  background: var(--casa-dica);
+  padding: 0 0.4em;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ---------- Diagnóstico (?debug=1) ---------- */
 

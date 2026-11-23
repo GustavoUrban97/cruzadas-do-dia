@@ -28,6 +28,7 @@ MAX_LACUNAS = 4  # dicas de completar ("___" ou "(?)") por puzzle; acima disso s
 NIVEIS = ("facil", "media", "dificil")  # mesma ordem de js/niveis.js
 NOME_ARQUIVO = re.compile(r"^\d{4}-\d{2}-\d{2}-(facil|media|dificil)\.json$")
 LINHA_VALIDA = re.compile(r"^[A-Z#]+$")
+COR = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 # direcao -> (deslocamento até a 1ª letra, sentido da palavra)
 DIRECOES = {
@@ -170,6 +171,14 @@ def validar_puzzle(caminho):
         if len(banco) > 6:
             avisos.append(f"banco com {len(banco)} palavras pode não caber embaixo da grade")
 
+    # tema (opcional): {"nome": "...", "cor": "#rrggbb"}; os níveis do dia têm o mesmo nome
+    tema = puzzle.get("tema")
+    if tema is not None:
+        if not isinstance(tema, dict) or not isinstance(tema.get("nome"), str) or not tema["nome"].strip():
+            erros.append('tema deve ser {"nome": "...", "cor": "#rrggbb"}')
+        elif "cor" in tema and not COR.match(str(tema["cor"])):
+            erros.append(f"cor do tema inválida: {tema['cor']} (use #rrggbb)")
+
     return puzzle, erros, avisos
 
 
@@ -177,6 +186,7 @@ def main():
     arquivos = sorted(p for p in PASTA.glob("*.json") if p.name != INDICE.name)
     problemas = 0
     niveis_por_data = {}
+    temas = {}  # data -> nome do tema (o app marca no calendário)
     ids = {}
 
     for caminho in arquivos:
@@ -200,12 +210,15 @@ def main():
             problemas += 1
         else:
             niveis_por_data.setdefault(puzzle["data"], []).append(puzzle["nivel"])
+            if isinstance(puzzle.get("tema"), dict):
+                temas.setdefault(puzzle["data"], puzzle["tema"]["nome"])
 
     if problemas:
         print(f"\n{problemas} puzzle(s) com problema. index.json não foi atualizado.")
         return 1
 
-    # {"datas": {"AAAA-MM-DD": ["facil", "media", "dificil"]}}, datas e níveis em ordem
+    # {"datas": {"AAAA-MM-DD": ["facil", "media", "dificil"]}}, datas e níveis em ordem,
+    # mais {"temas": {"AAAA-MM-DD": "nome"}} só se algum dia tiver tema
     indice = {
         data: sorted(niveis, key=NIVEIS.index)
         for data, niveis in sorted(niveis_por_data.items())
